@@ -1,0 +1,783 @@
+{
+  "generatedAt": "2026-04-25T04:25:18.201Z",
+  "sources": [
+    "https://tsuburaya-prod.com/heroeslist?mobile-app=true&theme=false",
+    "https://tsuburaya.miraheze.org/wiki/Template:Ultras",
+    "https://ultra.fandom.com/wiki/Category:Ultras",
+    "https://ultraseries.fandom.com/wiki/Seven%27s_Superior"
+  ],
+  "items": [
+    {
+      "target": "Ultraman",
+      "label": "Ultraman",
+      "imageSrc": "/stickers/m78/ultraman.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman/A Type",
+      "label": "A Type",
+      "imageSrc": "/stickers/m78/ultraman-a-type.png",
+      "source": "existing-generated",
+      "sha256": "f2515a879a6cadf6e4e1cb214214d052ac600f005e6ab79fd0d14628c9c35b2a",
+      "size": 345406
+    },
+    {
+      "target": "Ultraman/B Type",
+      "label": "B Type",
+      "imageSrc": "/stickers/m78/ultraman-b-type.png",
+      "source": "existing-generated",
+      "sha256": "f2515a879a6cadf6e4e1cb214214d052ac600f005e6ab79fd0d14628c9c35b2a",
+      "size": 345406
+    },
+    {
+      "target": "Ultraman/C Type",
+      "label": "C Type",
+      "imageSrc": "/stickers/m78/ultraman-c-type.png",
+      "source": "existing-generated",
+      "sha256": "f2515a879a6cadf6e4e1cb214214d052ac600f005e6ab79fd0d14628c9c35b2a",
+      "size": 345406
+    },
+    {
+      "target": "Zoffy",
+      "label": "Zoffy",
+      "imageSrc": "/stickers/m78/zoffy.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraseven",
+      "label": "Ultraseven",
+      "imageSrc": "/stickers/m78/seven.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Seven's Superior",
+      "label": "Seven's Superior",
+      "imageSrc": "/stickers/m78/sevens-superior.webp",
+      "source": "existing-generated",
+      "sha256": "be6d38924d7ccb6fc111a89d59702d71400ffc3fa4c5d6d5354801a8a33387cd",
+      "size": 15886
+    },
+    {
+      "target": "Ultraman Jack",
+      "label": "Ultraman Jack",
+      "imageSrc": "/stickers/m78/jack.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman Ace",
+      "label": "Ultraman Ace",
+      "imageSrc": "/stickers/m78/ace.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Father of Ultra",
+      "label": "Father of Ultra",
+      "imageSrc": "/stickers/m78/father.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Mother of Ultra",
+      "label": "Mother of Ultra",
+      "imageSrc": "/stickers/m78/mother.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman Taro",
+      "label": "Ultraman Taro",
+      "imageSrc": "/stickers/m78/taro.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman Leo",
+      "label": "Ultraman Leo",
+      "imageSrc": "/stickers/m78/ultraman-leo.png",
+      "source": "existing-generated",
+      "sha256": "865eba213af3c3c41c9b018e29ab662aad44af3b59aa17eefe06ab8afb0b7587",
+      "size": 370380
+    },
+    {
+      "target": "Astra",
+      "label": "Astra",
+      "imageSrc": "/stickers/m78/astra.png",
+      "source": "existing-generated",
+      "sha256": "d033be336fb83c86ae15850ef36c89b03d0638887e596b019b8992664fc58141",
+      "size": 631804
+    },
+    {
+      "target": "Ultraman King",
+      "label": "Ultraman King",
+      "imageSrc": "/stickers/m78/ultraman-king.png",
+      "source": "existing-generated",
+      "sha256": "7368fcc0f051bdcd14e4381917d884907331b959c04a29d709d8bf5c9c9a7237",
+      "size": 823554
+    },
+    {
+      "target": "Ultraman Joneus",
+      "label": "Ultraman Joneus",
+      "imageSrc": "/stickers/m78/ultraman-joneus.webp",
+      "source": "existing-generated",
+      "sha256": "2f66d375fa515bcd39384b40816b0db5e24a37acef5dce8a2dd317868de760f6",
+      "size": 276636
+    },
+    {
+      "target": "Loto",
+      "label": "Loto",
+      "imageSrc": "/stickers/m78/loto.webp",
+      "source": "existing-generated",
+      "sha256": "70bcfbd7010e0dce87adbbc45791ba6ef9ff796e0301d7e890699c1a6456064d",
+      "size": 84488
+    },
+    {
+      "target": "Elek",
+      "label": "Elek",
+      "imageSrc": "/stickers/m78/elek.webp",
+      "source": "existing-generated",
+      "sha256": "9cb6ae9f9d25771f9c020328fcd0665e8794609db98652d0666612ea509d5420",
+      "size": 74304
+    },
+    {
+      "target": "Amia",
+      "label": "Amia",
+      "imageSrc": "/stickers/m78/amia.webp",
+      "source": "existing-generated",
+      "sha256": "fe212d3810b198ff8e1d334f462782c7a226a05423263a9fe534f74e0845e831",
+      "size": 67810
+    },
+    {
+      "target": "Ultraman 80",
+      "label": "Ultraman 80",
+      "imageSrc": "/stickers/m78/eighty.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Yullian",
+      "label": "Yullian",
+      "imageSrc": "/stickers/m78/yullian.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman Zearth",
+      "label": "Ultraman Zearth",
+      "imageSrc": "/stickers/m78/ultraman-zearth.webp",
+      "source": "existing-generated",
+      "sha256": "3fcd8abfef9022990318f2ebe2908385ac384a2ae42c674e3695ea3d835a233d",
+      "size": 108878
+    },
+    {
+      "target": "Ultraman Tiga",
+      "label": "Ultraman Tiga",
+      "imageSrc": "/stickers/m78/ultraman-tiga.webp",
+      "source": "existing-generated",
+      "sha256": "9fdc01c9deaa8e28394474c41bb51064efc768ee0bc4f135c0a06149303a8919",
+      "size": 17978
+    },
+    {
+      "target": "Ultraman Dyna",
+      "label": "Ultraman Dyna",
+      "imageSrc": "/stickers/m78/ultraman-dyna.webp",
+      "source": "existing-generated",
+      "sha256": "20d20958397a48ef453bb34a1d14200a2b737b888820782a7adece13243453ce",
+      "size": 16236
+    },
+    {
+      "target": "Ultraman Gaia",
+      "label": "Ultraman Gaia",
+      "imageSrc": "/stickers/m78/ultraman-gaia.webp",
+      "source": "existing-generated",
+      "sha256": "3bc89acafb26ab9c6b20d22bdcf73e9845ec6cd93227abaf70458db4a4390bb3",
+      "size": 21032
+    },
+    {
+      "target": "Ultraman Agul",
+      "label": "Ultraman Agul",
+      "imageSrc": "/stickers/m78/ultraman-agul.webp",
+      "source": "existing-generated",
+      "sha256": "76bdd0be5dfbb488335dbdc910a211b90be73660b20562b6e02c6bbb43909620",
+      "size": 45290
+    },
+    {
+      "target": "Ultraman Nice",
+      "label": "Ultraman Nice",
+      "imageSrc": "/stickers/m78/ultraman-nice.webp",
+      "source": "existing-generated",
+      "sha256": "efa7c4ffa4656fe313ff29f6a174253784fcc7afe483920bab9ecf90dad2b365",
+      "size": 12868
+    },
+    {
+      "target": "Ultraman Neos",
+      "label": "Ultraman Neos",
+      "imageSrc": "/stickers/m78/ultraman-neos.webp",
+      "source": "existing-generated",
+      "sha256": "b066cc388c4a2000fcf85aa3ca22a4e65110cdd1ef18f676ac5f480330da1b09",
+      "size": 16026
+    },
+    {
+      "target": "Ultraseven 21",
+      "label": "Ultraseven 21",
+      "imageSrc": "/stickers/m78/ultraseven-21.webp",
+      "source": "existing-generated",
+      "sha256": "ad9ed728120411b8af23197aba8d9f4cd33d12496a70e37991e61fdd6802fab8",
+      "size": 54728
+    },
+    {
+      "target": "Ultraman Cosmos",
+      "label": "Ultraman Cosmos",
+      "imageSrc": "/stickers/m78/ultraman-cosmos.webp",
+      "source": "existing-generated",
+      "sha256": "d03ca86ef4f141f023f95715740cbf8092a7968c3f816804b3e177c49ed03f8c",
+      "size": 20530
+    },
+    {
+      "target": "Ultraman Justice",
+      "label": "Ultraman Justice",
+      "imageSrc": "/stickers/m78/ultraman-justice.webp",
+      "source": "existing-generated",
+      "sha256": "1e59c68df13af789b40beff3b4382703997186ca91a488dfa761653b35779e65",
+      "size": 49608
+    },
+    {
+      "target": "Ultraman Legend",
+      "label": "Ultraman Legend",
+      "imageSrc": "/stickers/m78/ultraman-legend.webp",
+      "source": "existing-generated",
+      "sha256": "d6ee7c056eadfb90b628ea4acbe998f69c9dd2d3e717a56625c8f8dd19f4f3fd",
+      "size": 65312
+    },
+    {
+      "target": "Ultraman Boy",
+      "label": "Ultraman Boy",
+      "imageSrc": "/stickers/m78/ultraman-boy.webp",
+      "source": "existing-generated",
+      "sha256": "b91539c4ccd1749d37b6f815635c63111b5fd577502af51101bf3e031c1d51f4",
+      "size": 51584
+    },
+    {
+      "target": "Ultraman the Next",
+      "label": "Ultraman the Next",
+      "imageSrc": "/stickers/m78/ultraman-the-next.webp",
+      "source": "existing-generated",
+      "sha256": "cb43b62d15552e55fbf7b52086f5f9acc91ab83fb7261e7f27373e0613e62aab",
+      "size": 97818
+    },
+    {
+      "target": "Ultraman Nexus",
+      "label": "Ultraman Nexus",
+      "imageSrc": "/stickers/m78/ultraman-nexus.webp",
+      "source": "existing-generated",
+      "sha256": "27082ad89a5e8035580b7246a88b916826cbdfe97e387c14042159281ae461f3",
+      "size": 58142
+    },
+    {
+      "target": "Ultraman Noa",
+      "label": "Ultraman Noa",
+      "imageSrc": "/stickers/m78/ultraman-noa.webp",
+      "source": "existing-generated",
+      "sha256": "b079d67f0bbaf0e725630d9dd17413180848f8c2285c825a92fb359ec8cceeef",
+      "size": 83940
+    },
+    {
+      "target": "Ultraman Max",
+      "label": "Ultraman Max",
+      "imageSrc": "/stickers/m78/ultraman-max.webp",
+      "source": "existing-generated",
+      "sha256": "52b05e4d19491b1743e04c272de2e00b7eb1ba35aafb3c2ccbaa896110cf0972",
+      "size": 46178
+    },
+    {
+      "target": "Ultraman Mebius",
+      "label": "Ultraman Mebius",
+      "imageSrc": "/stickers/m78/mebius.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman Hikari",
+      "label": "Ultraman Hikari",
+      "imageSrc": "/stickers/m78/hikari.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman Zero",
+      "label": "Ultraman Zero",
+      "imageSrc": "/stickers/m78/zero.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman Saga",
+      "label": "Ultraman Saga",
+      "imageSrc": "/stickers/m78/ultraman-saga.webp",
+      "source": "existing-generated",
+      "sha256": "c913afd6fbbae1323a4b0ec455de6136b822e895b180206b4be80d35468f9b5f",
+      "size": 73992
+    },
+    {
+      "target": "Ultraman Ginga",
+      "label": "Ultraman Ginga",
+      "imageSrc": "/stickers/m78/ultraman-ginga.webp",
+      "source": "existing-generated",
+      "sha256": "53edd0413b78418d801962e2b5fd53b86864ec503d6911f0f27d688a5c52f2e5",
+      "size": 67266
+    },
+    {
+      "target": "Ultraman Victory",
+      "label": "Ultraman Victory",
+      "imageSrc": "/stickers/m78/ultraman-victory.webp",
+      "source": "existing-generated",
+      "sha256": "a421616df6ce328925ff3863220aaa3f30e63131eecd02ce57996e1e56fdd0d7",
+      "size": 53650
+    },
+    {
+      "target": "Ultraman Ginga Victory",
+      "label": "Ultraman Ginga Victory",
+      "imageSrc": "/stickers/m78/ultraman-ginga-victory.webp",
+      "source": "existing-generated",
+      "sha256": "00845f2ad25b9a7c1205d15ea09ef6d29ee3cd2613329f6f86a399d5aafeda24",
+      "size": 452108
+    },
+    {
+      "target": "Ultraman X",
+      "label": "Ultraman X",
+      "imageSrc": "/stickers/m78/ultraman-x.webp",
+      "source": "existing-generated",
+      "sha256": "3fadf93c065ad3b918c09f05faa2380b33acfb7eea309aa70ae44c9b76b98d86",
+      "size": 75680
+    },
+    {
+      "target": "Ultraman Orb",
+      "label": "Ultraman Orb",
+      "imageSrc": "/stickers/m78/ultraman-orb.webp",
+      "source": "existing-generated",
+      "sha256": "42c56acc326797fed7b531962152053c96a1e863c5850b78e4dd5756a12195ed",
+      "size": 96176
+    },
+    {
+      "target": "Ultraman Geed",
+      "label": "Ultraman Geed",
+      "imageSrc": "/stickers/m78/ultraman-geed.webp",
+      "source": "existing-generated",
+      "sha256": "8186f74733922349a27b60ca4269e833f12dea39808eaa47c21f78425d1d039f",
+      "size": 77524
+    },
+    {
+      "target": "Ultraman Rosso",
+      "label": "Ultraman Rosso",
+      "imageSrc": "/stickers/m78/ultraman-rosso.webp",
+      "source": "existing-generated",
+      "sha256": "d37e609065e37495813a706eb03ff338b521d2ee0862421a87e5997d0dd6a665",
+      "size": 70524
+    },
+    {
+      "target": "Ultraman Blu",
+      "label": "Ultraman Blu",
+      "imageSrc": "/stickers/m78/ultraman-blu.webp",
+      "source": "existing-generated",
+      "sha256": "d7519889e762b59ba8ba5611d5c638f84c38570316e9f721adddef865271975b",
+      "size": 57258
+    },
+    {
+      "target": "Ultraman Ruebe",
+      "label": "Ultraman Ruebe",
+      "imageSrc": "/stickers/m78/ultraman-ruebe.webp",
+      "source": "existing-generated",
+      "sha256": "037c0c6a0a90ac2d0f4f9338ff28fe0b9f9c05e5d7823f70995f28ddec328050",
+      "size": 110060
+    },
+    {
+      "target": "Ultrawoman Grigio",
+      "label": "Ultrawoman Grigio",
+      "imageSrc": "/stickers/m78/ultrawoman-grigio.webp",
+      "source": "existing-generated",
+      "sha256": "1411df862aa38d1722fd7bf90c5e5d274f44dbcfa3711789df96c2ec338a5cad",
+      "size": 250298
+    },
+    {
+      "target": "Ultraman Groob",
+      "label": "Ultraman Groob",
+      "imageSrc": "/stickers/m78/ultraman-groob.webp",
+      "source": "existing-generated",
+      "sha256": "25b95bdba16bf269e4b32ce36f7cf39c39bb71a9d30f4b6bb3fcd00f94856f32",
+      "size": 99736
+    },
+    {
+      "target": "Ultraman Taiga",
+      "label": "Ultraman Taiga",
+      "imageSrc": "/stickers/m78/taiga.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Ultraman Titas",
+      "label": "Ultraman Titas",
+      "imageSrc": "/stickers/m78/ultraman-titas.webp",
+      "source": "existing-generated",
+      "sha256": "bd0ac0a533f25a8d07a541a4a37761a70cbbf702dd05d70c512896ed2c94c902",
+      "size": 58872
+    },
+    {
+      "target": "Ultraman Fuma",
+      "label": "Ultraman Fuma",
+      "imageSrc": "/stickers/m78/ultraman-fuma.webp",
+      "source": "existing-generated",
+      "sha256": "4a5f0adacd4a500ef511812c75c840608a97ca5a2a954cdce885f362ebd560a2",
+      "size": 51688
+    },
+    {
+      "target": "Ultraman Reiga",
+      "label": "Ultraman Reiga",
+      "imageSrc": "/stickers/m78/ultraman-reiga.webp",
+      "source": "existing-generated",
+      "sha256": "a3ecf68f2291d14c5bd839d8e2c18619f346ad96700ee6b49ac11e57cef0ef46",
+      "size": 163246
+    },
+    {
+      "target": "Ultraman Z",
+      "label": "Ultraman Z",
+      "imageSrc": "/stickers/m78/z.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Sora",
+      "label": "Sora",
+      "imageSrc": "/stickers/m78/sora.webp",
+      "source": "existing-generated",
+      "sha256": "de7a494aad4b6b7123bbb1f29c0b348f1c29cf3361ae4515e9f9c7c4793b80c2",
+      "size": 63324
+    },
+    {
+      "target": "Ultraman Trigger",
+      "label": "Ultraman Trigger",
+      "imageSrc": "/stickers/m78/ultraman-trigger.webp",
+      "source": "existing-generated",
+      "sha256": "6277ce20192c50563fe813188c9c6327de315db45597bd73d6c65ac1b01b9e03",
+      "size": 228372
+    },
+    {
+      "target": "Ultraman Regulos",
+      "label": "Ultraman Regulos",
+      "imageSrc": "/stickers/m78/ultraman-regulos.webp",
+      "source": "existing-generated",
+      "sha256": "3d461802212e369262e9defadc0caae6a0f64b9fdf7c0f2d1fa2d8545d8e20dd",
+      "size": 1069324
+    },
+    {
+      "target": "Ultraman Decker",
+      "label": "Ultraman Decker",
+      "imageSrc": "/stickers/m78/ultraman-decker.webp",
+      "source": "existing-generated",
+      "sha256": "a73f825202e856497527cfb36865b93eaae875a169438e70282e1908883bf05a",
+      "size": 126952
+    },
+    {
+      "target": "Ultraman Dinas",
+      "label": "Ultraman Dinas",
+      "imageSrc": "/stickers/m78/ultraman-dinas.webp",
+      "source": "existing-generated",
+      "sha256": "49dc6a6e07a9ead72869a232f0e71512857c7d31a4663124f29884af129e8375",
+      "size": 43344
+    },
+    {
+      "target": "Ultraman Blazar",
+      "label": "Ultraman Blazar",
+      "imageSrc": "/stickers/m78/ultraman-blazar.webp",
+      "source": "existing-generated",
+      "sha256": "8a8d9eec7f3348ae196c9fbd828845c3528febbbc89b401d70ed7b7b3de34175",
+      "size": 107296
+    },
+    {
+      "target": "Ultraman Omega",
+      "label": "Ultraman Omega",
+      "imageSrc": "/stickers/m78/ultraman-omega.webp",
+      "source": "existing-generated",
+      "sha256": "d0403bae5499a0485e79f4cfcd316483ac088dd60087256a56b4df84098104af",
+      "size": 99820
+    },
+    {
+      "target": "Alien Zarab",
+      "label": "Imitation Ultraman",
+      "imageSrc": "/stickers/m78/alien-zarab.webp",
+      "source": "existing-generated",
+      "sha256": "51b8972f31b0dd1a50a187866c9a27918e8f811d53e8fbbdf6e6efcecd4328fb",
+      "size": 42138
+    },
+    {
+      "target": "Evil Tiga",
+      "label": "Evil Tiga",
+      "imageSrc": "/stickers/m78/evil-tiga.webp",
+      "source": "existing-generated",
+      "sha256": "4f2fc31e9e767592cdb3e4b2f95a108b1c32caf98897369e53ac93ec2b02eb12",
+      "size": 54298
+    },
+    {
+      "target": "Camearra",
+      "label": "Camearra",
+      "imageSrc": "/stickers/m78/camearra.webp",
+      "source": "existing-generated",
+      "sha256": "1fe3a18aab1b56b16b1291ee999ad0cd87980098c38d9de98cfba67a908bd61d",
+      "size": 68618
+    },
+    {
+      "target": "Darramb",
+      "label": "Darramb",
+      "imageSrc": "/stickers/m78/darramb.webp",
+      "source": "existing-generated",
+      "sha256": "053ffac1c6a2cd04134f618d482724d66b3508cc4448f9e01070953f47b57de0",
+      "size": 45358
+    },
+    {
+      "target": "Hudra",
+      "label": "Hudra",
+      "imageSrc": "/stickers/m78/hudra.webp",
+      "source": "existing-generated",
+      "sha256": "ac6a37c88ed1cad680e4ee405a2300ae8ddbd93369f6b120ab1b5c5fb471f05a",
+      "size": 34882
+    },
+    {
+      "target": "Dark Faust",
+      "label": "Dark Faust",
+      "imageSrc": "/stickers/m78/dark-faust.webp",
+      "source": "existing-generated",
+      "sha256": "2978edde6a42c21a6a7ab87ef3137ed6afbe47061f9f3a36b8d33dacdd8794c4",
+      "size": 144836
+    },
+    {
+      "target": "Dark Mephisto",
+      "label": "Dark Mephisto",
+      "imageSrc": "/stickers/m78/dark-mephisto.webp",
+      "source": "existing-generated",
+      "sha256": "0df829ebbfec99f04cb35a1fb981136e0e12cc034de8ec03ed73a9177a003806",
+      "size": 115050
+    },
+    {
+      "target": "Dark Mephisto Zwei",
+      "label": "Dark Mephisto Zwei",
+      "imageSrc": "/stickers/m78/dark-mephisto-zwei.webp",
+      "source": "existing-generated",
+      "sha256": "57483ffe52aece63a34cf2a682a99f47639038c32ebf919e98eb96b6e464da2c",
+      "size": 54396
+    },
+    {
+      "target": "Dark Zagi",
+      "label": "Dark Zagi",
+      "imageSrc": "/stickers/m78/dark-zagi.webp",
+      "source": "existing-generated",
+      "sha256": "99d6ab73a8c7e02b03599f01fb6737f0c140415b9ba85369bdbddb06f6fdda47",
+      "size": 51886
+    },
+    {
+      "target": "Ultraman Belial",
+      "label": "Ultraman Belial",
+      "imageSrc": "/stickers/m78/ultraman-belial.webp",
+      "source": "existing-generated",
+      "sha256": "22099e250342812ca1602e8ed354e104d5fbcc281b0c2ed08c41872503f88640",
+      "size": 229232
+    },
+    {
+      "target": "Darklops Zero",
+      "label": "Darklops Zero",
+      "imageSrc": "/stickers/m78/darklops-zero.webp",
+      "source": "existing-generated",
+      "sha256": "942c519f465e91711504a6f668e98dbccc112018990b5afbfd945a4b0a15da8c",
+      "size": 56720
+    },
+    {
+      "target": "Darklops",
+      "label": "Darklops",
+      "imageSrc": "/stickers/m78/darklops.webp",
+      "source": "existing-generated",
+      "sha256": "acd43c48d0ef181bdb03877f0908877a8e2e667dea01af5c69fc9da4daf0b2f5",
+      "size": 125908
+    },
+    {
+      "target": "Ultraman Zero Darkness",
+      "label": "Ultraman Zero Darkness",
+      "imageSrc": "/stickers/m78/ultraman-zero-darkness.webp",
+      "source": "existing-generated",
+      "sha256": "da66203c26de8d7da06d1874945e123c9fdb51cd2c20dd079051e0a0c8bc8394",
+      "size": 137294
+    },
+    {
+      "target": "Ultraman Orb Dark",
+      "label": "Ultraman Orb Dark",
+      "imageSrc": "/stickers/m78/ultraman-orb-dark.webp",
+      "source": "existing-generated",
+      "sha256": "2ab09d89d6fd6b96f2375d200339850c5452211c44075efef5d8c3c78265a317",
+      "size": 23926
+    },
+    {
+      "target": "Ultraman Tregear",
+      "label": "Ultraman Tregear",
+      "imageSrc": "/stickers/m78/ultraman-tregear.webp",
+      "source": "existing-generated",
+      "sha256": "df82513f23c2f83ca21334ffbf1d91d6a425f3aa80a505685b26b570f0bd9521",
+      "size": 49386
+    },
+    {
+      "target": "Imit-Ultraman Belial",
+      "label": "Imit-Ultraman Belial",
+      "imageSrc": "/stickers/m78/imit-ultraman-belial.webp",
+      "source": "existing-generated",
+      "sha256": "59d655ba31dba85e3a5d4ebdf2283d26988d154858661d6b8d0a36eba1ddeff8",
+      "size": 69188
+    },
+    {
+      "target": "Ultraman X Darkness",
+      "label": "Ultraman X Darkness",
+      "imageSrc": "/stickers/m78/ultraman-x-darkness.webp",
+      "source": "existing-generated",
+      "sha256": "d844b29010ed77a54d9edee08732105250283484e3b548cac79711c1d338d547",
+      "size": 30364
+    },
+    {
+      "target": "Ultraman Orb Darkness",
+      "label": "Ultraman Orb Darkness",
+      "imageSrc": "/stickers/m78/ultraman-orb-darkness.webp",
+      "source": "existing-generated",
+      "sha256": "82723413d79548af321b6c70148879d7207ba47c31e70a4f0c8816ce7dfe63fe",
+      "size": 100268
+    },
+    {
+      "target": "Ultraman Geed Darkness",
+      "label": "Ultraman Geed Darkness",
+      "imageSrc": "/stickers/m78/ultraman-geed-darkness.webp",
+      "source": "existing-generated",
+      "sha256": "8286adfcf1ae42770d91e7e8dd0ca7fcd392063ffe0bcb8d47b7658cd03970b6",
+      "size": 32914
+    },
+    {
+      "target": "Ultrawoman Grigio Darkness",
+      "label": "Ultrawoman Grigio Darkness",
+      "imageSrc": "/stickers/m78/ultrawoman-grigio-darkness.webp",
+      "source": "existing-generated",
+      "sha256": "30be1abe3169c00295132fcb42a67bccc3430d0230d8035ec27072e300cce64f",
+      "size": 96610
+    },
+    {
+      "target": "Carmeara",
+      "label": "Carmeara",
+      "imageSrc": "/stickers/m78/carmeara.webp",
+      "source": "existing-generated",
+      "sha256": "06dfc8374a6c6d1be289f84ec919dd07456d1c166699deb9faa667e2d463ca55",
+      "size": 106950
+    },
+    {
+      "target": "Darrgon",
+      "label": "Darrgon",
+      "imageSrc": "/stickers/m78/darrgon.webp",
+      "source": "existing-generated",
+      "sha256": "664904e1bbb142f846e9a245602f51a0d7c69b15a8d9d26d29431eaf5d95ec01",
+      "size": 110968
+    },
+    {
+      "target": "Hudram",
+      "label": "Hudram",
+      "imageSrc": "/stickers/m78/hudram.webp",
+      "source": "existing-generated",
+      "sha256": "fe2b8c3a86f8733bb1b1f422d61ebc21531d2f2b521394f4ebf9cf9b4b86472a",
+      "size": 107630
+    },
+    {
+      "target": "Evil Trigger",
+      "label": "Evil Trigger",
+      "imageSrc": "/stickers/m78/evil-trigger.webp",
+      "source": "existing-generated",
+      "sha256": "597b7485eda05fb2977cc4b3c7b466297dc2647dadaa82b1908336af760b297a",
+      "size": 107404
+    },
+    {
+      "target": "Ultraman Scott",
+      "label": "Ultraman Scott",
+      "imageSrc": "/stickers/m78/ultraman-scott.webp",
+      "source": "existing-generated",
+      "sha256": "2b010aeee118e22de848ae389d1572dac1fb38104102ccbe2097a70399101a9b",
+      "size": 34028
+    },
+    {
+      "target": "Ultraman Chuck",
+      "label": "Ultraman Chuck",
+      "imageSrc": "/stickers/m78/ultraman-chuck.webp",
+      "source": "existing-generated",
+      "sha256": "48624d29c837263a84d4e1edaf37e5fbb8666177d6e38ff8f715cf66ce060d8e",
+      "size": 35436
+    },
+    {
+      "target": "Ultrawoman Beth",
+      "label": "Ultrawoman Beth",
+      "imageSrc": "/stickers/m78/ultrawoman-beth.webp",
+      "source": "existing-generated",
+      "sha256": "33895715b2caa85bcfb65d0d2d463dd4237eb21bd278108b058e6608ec738875",
+      "size": 31094
+    },
+    {
+      "target": "Ultraman Great",
+      "label": "Ultraman Great",
+      "imageSrc": "/stickers/m78/ultraman-great.webp",
+      "source": "existing-generated",
+      "sha256": "47a657b8d420a16c0e3d0fb70ec6faa72a3511a9c7faa3920cb133ff09d9cca6",
+      "size": 56884
+    },
+    {
+      "target": "Ultraman Powered",
+      "label": "Ultraman Powered",
+      "imageSrc": "/stickers/m78/ultraman-powered.webp",
+      "source": "existing-generated",
+      "sha256": "6e2aaecbcd744a9803c3fc8056d738078a033b2499e446c3d914c6c497732d03",
+      "size": 53652
+    },
+    {
+      "target": "Ultraman Ribut",
+      "label": "Ultraman Ribut",
+      "imageSrc": "/stickers/m78/ribut.jpg",
+      "source": "existing-local"
+    },
+    {
+      "target": "Imitation Ultraseven",
+      "label": "Imitation Ultraseven",
+      "imageSrc": "/stickers/m78/imitation-ultraseven.webp",
+      "source": "existing-generated",
+      "sha256": "90ab313efe5dbea804ae2e92cbbcd549b94eab30abda2c3d29a6bd06a772d056",
+      "size": 178744
+    },
+    {
+      "target": "Ace-Robot",
+      "label": "Ace-Robot",
+      "imageSrc": "/stickers/m78/ace-robot.webp",
+      "source": "existing-generated",
+      "sha256": "96753a8b1c3bcd7054d804476ae9471e28ae281dd2660448fbf68767a36ee79f",
+      "size": 105806
+    },
+    {
+      "target": "Alien Babarue",
+      "label": "Imitation Astra",
+      "imageSrc": "/stickers/m78/alien-babarue.webp",
+      "source": "existing-generated",
+      "sha256": "6ae4b9640c3b5732000cd94e67a8b3e840cc26e7a178a7c25ef4971f845a8440",
+      "size": 77254
+    },
+    {
+      "target": "Delusion Ultraseven",
+      "label": "Delusion Ultraseven",
+      "imageSrc": "/stickers/m78/delusion-ultraseven.webp",
+      "source": "existing-generated",
+      "sha256": "e85cadbac578f468ecad44d7391894cb3233b22efb80074d95cf0a01c59d9e3d",
+      "size": 67804
+    },
+    {
+      "target": "Imitation Ultraman Joneus",
+      "label": "Imitation Ultraman Joneus",
+      "imageSrc": "/stickers/m78/imitation-ultraman-joneus.webp",
+      "source": "ultraman-wiki",
+      "pageUrl": "https://ultra.fandom.com/wiki/Ultraman_Joneus",
+      "imageUrl": "https://static.wikia.nocookie.net/ultra/images/3/36/Joe_data.png/revision/latest?cb=20230508010047",
+      "sha256": "2f66d375fa515bcd39384b40816b0db5e24a37acef5dce8a2dd317868de760f6",
+      "size": 276636
+    },
+    {
+      "target": "Ultraman Shadow",
+      "label": "Ultraman Shadow",
+      "imageSrc": "/stickers/m78/ultraman-shadow.webp",
+      "source": "ultraman-wiki",
+      "pageUrl": "https://ultra.fandom.com/wiki/Ultraman_Shadow",
+      "imageUrl": "https://static.wikia.nocookie.net/ultra/images/8/87/Ultraman_Zearth_2_04.png/revision/latest?cb=20230413131654",
+      "sha256": "2501d00750cc844dab4eb92a8ae1b9b6d1393163e95be60851304890b04d4811",
+      "size": 372898
+    }
+  ]
+}

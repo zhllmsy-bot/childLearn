@@ -1,0 +1,43 @@
+{
+  "name": "child-learn",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173 --strictPort",
+    "dev:index": "vite --mode indextts --host 0.0.0.0 --port 5173 --strictPort",
+    "dev:volc": "vite --mode volcengine --host 0.0.0.0 --port 5173 --strictPort",
+    "dev:flow": "vite --mode flow --host 0.0.0.0 --port 5173 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "lint": "tsc --noEmit --pretty false",
+    "metrics:flow": "node tools/analyze_flow_metrics.mjs",
+    "voice:setup": "python3 -m pip install --no-cache-dir -r requirements-voice.txt",
+    "voice:serve": "python3 tools/edge_tts_server.py",
+    "voice:serve:volc": "python3 tools/volcengine_tts_server.py",
+    "voice:serve:volc:lan": "VOLCENGINE_TTS_HOST=0.0.0.0 python3 tools/volcengine_tts_server.py",
+    "flow:observe": "python3 tools/flow_observer_server.py",
+    "voice:serve:index": "cd output/indextts2-poc/index-tts && env TOKENIZERS_PARALLELISM=false uv run python ../../../tools/indextts2_tts_server.py",
+    "voice:serve:index:preload": "cd output/indextts2-poc/index-tts && env TOKENIZERS_PARALLELISM=false uv run python ../../../tools/indextts2_tts_server.py --preload"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "canvas-confetti": "^1.9.3",
+    "framer-motion": "^12.23.24",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^4.1.5"
+  }
+}
