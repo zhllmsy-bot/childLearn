@@ -14,6 +14,26 @@ export default {
           'sans-serif',
         ],
       },
+      colors: {
+        child: {
+          cream: '#FFF9EF',
+          mint: '#EAF9E6',
+          'mint-deep': '#C8EDBC',
+          leaf: '#3EA02D',
+          'leaf-dark': '#1E6B13',
+          sky: '#EAF4FF',
+          'sky-mid': '#C2E0FF',
+          blue: '#2E8CF0',
+          'blue-soft': '#7BBBFF',
+          sun: '#FFECB0',
+          gold: '#FFB200',
+          'gold-soft': '#FFD257',
+          peach: '#FFD9C2',
+          coral: '#F77444',
+          'coral-soft': '#FFA47A',
+          ink: '#183024',
+        },
+      },
       keyframes: {
         floaty: {
           '0%, 100%': { transform: 'translate3d(0, 0, 0) rotate(-4deg)' },

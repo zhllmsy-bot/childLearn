@@ -25,8 +25,12 @@ export function positionKey(position: ProgrammingPosition) {
   return `${position.x}:${position.y}`;
 }
 
+export function samePosition(left: ProgrammingPosition, right: ProgrammingPosition) {
+  return left.x === right.x && left.y === right.y;
+}
+
 export function isObstacle(world: InterpreterWorld, position: ProgrammingPosition) {
-  return world.obstacles.some((obstacle) => position.x === obstacle.x && position.y === obstacle.y);
+  return world.obstacles.some((obstacle) => samePosition(obstacle, position));
 }
 
 export function turnLeft(direction: ProgrammingDirection): ProgrammingDirection {
@@ -63,7 +67,26 @@ export function nextPosition(position: ProgrammingPosition, direction: Programmi
   };
 }
 
-export function hasReachedTarget(world: InterpreterWorld, bot: BotState) {
-  return bot.position.x === world.target.x && bot.position.y === world.target.y;
+export function jumpPosition(position: ProgrammingPosition, direction: ProgrammingDirection) {
+  return nextPosition(nextPosition(position, direction), direction);
 }
 
+export function canOccupy(world: InterpreterWorld, position: ProgrammingPosition) {
+  return isInsideWorld(world, position) && !isObstacle(world, position);
+}
+
+export function canGoForward(world: InterpreterWorld, bot: BotState) {
+  return canOccupy(world, nextPosition(bot.position, bot.direction));
+}
+
+export function hasGemAt(gems: ProgrammingPosition[], position: ProgrammingPosition) {
+  return gems.some((gem) => samePosition(gem, position));
+}
+
+export function collectGemAt(gems: ProgrammingPosition[], position: ProgrammingPosition) {
+  return gems.filter((gem) => !samePosition(gem, position));
+}
+
+export function hasReachedTarget(world: InterpreterWorld, bot: BotState) {
+  return samePosition(bot.position, world.target);
+}

@@ -3,35 +3,25 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   CheckCircle2,
-  CornerUpLeft,
-  CornerUpRight,
-  Flag,
   Lightbulb,
-  Lock,
-  Play,
-  Plus,
-  Repeat2,
-  RotateCcw,
   Route,
   Sparkles,
-  StepForward,
-  Trash2,
   Volume2,
 } from 'lucide-react';
 import {
   PROGRAMMING_LEVELS,
-  type ProgrammingCommandId,
-  type ProgrammingDirection,
   type ProgrammingLevel,
-  type ProgrammingPosition,
 } from '../../programming/programmingLevels';
 import { buildExecutionFrames } from '../../programming/engine/interpreter';
-import type { Block, ExecutionStep } from '../../programming/engine/types';
+import type { Block, BlockedReason, ExecutionStep, InterpreterWorld } from '../../programming/engine/types';
+import { cloneBlock, containsKind, createBlockFromTemplate, type ProgrammingBlockTemplateId } from '../../programming/blocks';
 import { evaluateStars } from '../../programming/engine/starEvaluator';
+import { positionKey } from '../../programming/engine/worldOps';
 import { SPRING } from '../../theme/springs';
-import { BigButton } from '../_primitives/BigButton';
-
-type RunStatus = 'idle' | 'running' | 'success' | 'blocked';
+import { ProgrammingBoard } from './ProgrammingBoard';
+import { ProgrammingEditor } from './ProgrammingEditor';
+import { ProgrammingLevelPicker } from './ProgrammingLevelPicker';
+import type { BotViewState, PlaybackSpeed, RunStatus } from './programmingViewTypes';
 
 interface ProgrammingIslandPageProps {
   onBack: () => void;
@@ -50,14 +40,7 @@ export interface ProgrammingCompletionResult {
   stars: 1 | 2 | 3;
   optimalSteps: number | null;
   requiredCommandSatisfied: boolean;
-  blockedReason?: 'wall' | 'obstacle';
-}
-
-type ExecutionFrame = ExecutionStep;
-
-interface BotState {
-  position: ProgrammingPosition;
-  direction: ProgrammingDirection;
+  blockedReason?: BlockedReason;
 }
 
 interface RunSummary {
@@ -65,73 +48,9 @@ interface RunSummary {
   stars: 1 | 2 | 3;
 }
 
-const BOARD_SIZE = 5;
 const BASE_STEP_DELAY_MS = 620;
-type PlaybackSpeed = 0.5 | 1 | 2;
-const SPEED_OPTIONS: Array<{ label: string; value: PlaybackSpeed }> = [
-  { label: '0.5×', value: 0.5 },
-  { label: '1×', value: 1 },
-  { label: '2×', value: 2 },
-];
 
-const DIRECTION_ARROW: Record<ProgrammingDirection, string> = {
-  north: '↑',
-  east: '→',
-  south: '↓',
-  west: '←',
-};
-
-const DIRECTION_ROTATE: Record<ProgrammingDirection, number> = {
-  north: 0,
-  east: 90,
-  south: 180,
-  west: -90,
-};
-
-const COMMAND_META: Record<
-  ProgrammingCommandId,
-  {
-    label: string;
-    shortLabel: string;
-    icon: typeof StepForward;
-    tone: string;
-  }
-> = {
-  forward: {
-    label: '前进',
-    shortLabel: '前进',
-    icon: StepForward,
-    tone: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  },
-  turnLeft: {
-    label: '左转',
-    shortLabel: '左转',
-    icon: CornerUpLeft,
-    tone: 'bg-sky-50 text-sky-800 ring-sky-200',
-  },
-  turnRight: {
-    label: '右转',
-    shortLabel: '右转',
-    icon: CornerUpRight,
-    tone: 'bg-amber-50 text-amber-800 ring-amber-200',
-  },
-  repeatForward2: {
-    label: '重复前进 2 次',
-    shortLabel: '前进×2',
-    icon: Repeat2,
-    tone: 'bg-rose-50 text-rose-800 ring-rose-200',
-  },
-};
-
-function samePosition(left: ProgrammingPosition, right: ProgrammingPosition) {
-  return left.x === right.x && left.y === right.y;
-}
-
-function positionKey(position: ProgrammingPosition) {
-  return `${position.x}:${position.y}`;
-}
-
-function createStartBot(level: ProgrammingLevel): BotState {
+function createStartBot(level: ProgrammingLevel): BotViewState {
   return {
     position: level.start,
     direction: level.direction,
@@ -143,55 +62,8 @@ function getLevelIndexById(levelId: string | null) {
   return index >= 0 ? index : 0;
 }
 
-function commandToBlock(command: ProgrammingCommandId, index: number): Block {
-  const blockId = `cmd-${index}`;
-
-  if (command === 'repeatForward2') {
-    return {
-      id: blockId,
-      kind: 'repeat',
-      params: { n: 2 },
-      body: [
-        {
-          id: `${blockId}:body.0`,
-          kind: 'forward',
-        },
-      ],
-    };
-  }
-
-  return {
-    id: blockId,
-    kind: command,
-  };
-}
-
-function buildProgramBlocks(program: ProgrammingCommandId[]): Block[] {
-  return program.map((command, index) => commandToBlock(command, index));
-}
-
-function describeExecutionMessage(
-  frame: ExecutionFrame,
-  level: ProgrammingLevel,
-  hasRequiredCommand: boolean,
-): string {
-  if (frame.status === 'blocked') {
-    return level.hintVoice;
-  }
-
-  if (frame.status === 'success') {
-    return hasRequiredCommand ? level.successVoice : level.requiredCommandMessage ?? level.successVoice;
-  }
-
-  if (frame.command === 'turnLeft' || frame.command === 'turnRight') {
-    return '小满换了一个方向。';
-  }
-
-  return '小满照着程序走了一步。';
-}
-
 function formatStarSummary(stars: 1 | 2 | 3) {
-  const filled = '★★★★★'.slice(0, stars);
+  const filled = '★★★'.slice(0, stars);
   const empty = '☆☆☆'.slice(stars);
   return `${filled}${empty}`;
 }
@@ -204,109 +76,58 @@ function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function LightHeroModel({
-  direction,
-  status,
-}: {
-  direction: ProgrammingDirection;
-  status: RunStatus;
-}) {
-  return (
-    <motion.div
-      aria-label="小满模型"
-      initial={false}
-      animate={{
-        rotate: DIRECTION_ROTATE[direction],
-        scale: status === 'success' ? 1.08 : status === 'blocked' ? 0.94 : 1,
-      }}
-      transition={SPRING.bounce}
-      className="relative h-full w-full"
-    >
-      <div className="absolute left-1/2 top-[6%] h-[78%] w-[58%] -translate-x-1/2 rounded-b-[42%] rounded-t-[48%] bg-gradient-to-b from-slate-50 via-slate-200 to-slate-400 shadow-[inset_0_-10px_18px_rgba(15,23,42,0.18)] ring-2 ring-white" />
-      <div className="absolute left-1/2 top-[8%] h-[34%] w-[42%] -translate-x-1/2 rounded-[45%] bg-gradient-to-b from-slate-50 to-slate-300 shadow-sm ring-2 ring-white">
-        <div className="absolute left-[18%] top-[38%] h-[16%] w-[24%] rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.85)]" />
-        <div className="absolute right-[18%] top-[38%] h-[16%] w-[24%] rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.85)]" />
-      </div>
-      <div className="absolute left-[18%] top-[42%] h-[32%] w-[18%] -rotate-12 rounded-full bg-gradient-to-b from-rose-400 to-red-500 ring-2 ring-white" />
-      <div className="absolute right-[18%] top-[42%] h-[32%] w-[18%] rotate-12 rounded-full bg-gradient-to-b from-rose-400 to-red-500 ring-2 ring-white" />
-      <div className="absolute left-1/2 top-[40%] h-[40%] w-[30%] -translate-x-1/2 rounded-b-[45%] bg-gradient-to-b from-red-500 via-rose-500 to-red-700 ring-2 ring-white" />
-      <div className="absolute left-1/2 top-[48%] h-[16%] w-[16%] -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(34,211,238,0.95)] ring-2 ring-white" />
-      <div className="absolute left-[34%] top-[78%] h-[18%] w-[13%] rounded-full bg-slate-300 ring-2 ring-white" />
-      <div className="absolute right-[34%] top-[78%] h-[18%] w-[13%] rounded-full bg-slate-300 ring-2 ring-white" />
-      <motion.div
-        animate={{ opacity: status === 'running' ? [0.35, 1, 0.35] : 0.55 }}
-        transition={{ duration: 0.9, repeat: status === 'running' ? Infinity : 0 }}
-        className="absolute left-1/2 top-[-18%] h-[30%] w-[16%] -translate-x-1/2 rounded-full bg-cyan-200 blur-sm"
-      />
-    </motion.div>
-  );
+function describeBlocked(reason: BlockedReason | undefined, level: ProgrammingLevel) {
+  if (reason === 'missingGem') {
+    return '这里没有能量星，先走到星星格子再收集。';
+  }
+  if (reason === 'unknownProcedure') {
+    return '这张小路卡还没有准备好。';
+  }
+  if (reason === 'maxSteps') {
+    return '小满走太久了，先暂停，看看循环里是不是少了出口。';
+  }
+  return level.hintVoice;
 }
 
-function CommandButton({
-  command,
-  onAdd,
-  disabled,
-}: {
-  command: ProgrammingCommandId;
-  onAdd: (command: ProgrammingCommandId) => void;
-  disabled: boolean;
-}) {
-  const meta = COMMAND_META[command];
-  const Icon = meta.icon;
+function describeExecutionMessage(
+  frame: ExecutionStep,
+  level: ProgrammingLevel,
+  hasRequiredCommand: boolean,
+) {
+  if (frame.status === 'blocked') {
+    return describeBlocked(frame.blockedReason, level);
+  }
 
-  return (
-    <motion.button
-      type="button"
-      whileHover={disabled ? undefined : { y: -3 }}
-      whileTap={disabled ? undefined : { scale: 0.96 }}
-      transition={SPRING.bounce}
-      disabled={disabled}
-      onClick={() => onAdd(command)}
-      className={`flex min-h-20 items-center justify-between gap-3 rounded-[1.25rem] px-4 text-left text-lg font-black shadow-sm ring-1 disabled:opacity-45 ${meta.tone}`}
-    >
-      <span className="flex items-center gap-3">
-        <Icon size={28} strokeWidth={3.2} />
-        {meta.label}
-      </span>
-      <Plus size={22} strokeWidth={3.2} />
-    </motion.button>
-  );
+  if (frame.status === 'success') {
+    return hasRequiredCommand ? level.successVoice : level.requiredCommandMessage ?? level.successVoice;
+  }
+
+  if (frame.command === 'turnLeft' || frame.command === 'turnRight') {
+    return '小满换了一个方向。';
+  }
+  if (frame.command === 'collect') {
+    return '能量星收进口袋了。';
+  }
+  if (frame.command === 'jump') {
+    return '小满跳过了一格。';
+  }
+
+  return '小满照着程序走了一步。';
 }
 
-function ProgramStep({
-  command,
-  index,
-  disabled,
-  onRemove,
-  active,
-}: {
-  command: ProgrammingCommandId;
-  index: number;
-  disabled: boolean;
-  onRemove: (index: number) => void;
-  active: boolean;
-}) {
-  const meta = COMMAND_META[command];
-  const Icon = meta.icon;
-
-  return (
-    <motion.button
-      type="button"
-      layout
-      whileTap={disabled ? undefined : { scale: 0.95 }}
-      disabled={disabled}
-      onClick={() => onRemove(index)}
-      aria-label={`删除第 ${index + 1} 步 ${meta.shortLabel}`}
-      className={`inline-flex h-14 shrink-0 items-center gap-2 rounded-2xl px-4 text-base font-black shadow-sm ring-1 ${
-        active ? 'ring-4 ring-amber-400 scale-105' : ''
-      } ${meta.tone}`}
-    >
-      <span className="rounded-full bg-white/75 px-2 py-0.5 text-sm">{index + 1}</span>
-      <Icon size={20} strokeWidth={3.2} />
-      {meta.shortLabel}
-      <Trash2 size={18} strokeWidth={3.2} />
-    </motion.button>
-  );
+function buildWorld(level: ProgrammingLevel): InterpreterWorld {
+  return {
+    width: level.width ?? 5,
+    height: level.height ?? 5,
+    start: level.start,
+    direction: level.direction,
+    target: level.target,
+    obstacles: level.obstacles,
+    gems: level.gems ?? [],
+    requiresAllGems: level.requiresAllGems,
+    procedures: level.procedures,
+    maxSteps: 120,
+  };
 }
 
 export function ProgrammingIslandPage({
@@ -319,83 +140,71 @@ export function ProgrammingIslandPage({
 }: ProgrammingIslandPageProps) {
   const [levelIndex, setLevelIndex] = useState(() => getLevelIndexById(initialLevelId));
   const level = PROGRAMMING_LEVELS[levelIndex];
-  const [program, setProgram] = useState<ProgrammingCommandId[]>([]);
-  const [bot, setBot] = useState<BotState>(() => createStartBot(level));
+  const [program, setProgram] = useState<Block[]>([]);
+  const [bot, setBot] = useState<BotViewState>(() => createStartBot(level));
   const [visitedKeys, setVisitedKeys] = useState<Set<string>>(
     () => new Set([positionKey(level.start)]),
   );
+  const [remainingGems, setRemainingGems] = useState(() => level.gems ?? []);
   const [status, setStatus] = useState<RunStatus>('idle');
   const [message, setMessage] = useState(level.prompt);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [executionFrames, setExecutionFrames] = useState<ExecutionStep[]>([]);
+  const [frameCursor, setFrameCursor] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
   const runIdRef = useRef(0);
+  const blockCounterRef = useRef(0);
+  const playbackActiveRef = useRef(false);
 
-  const isRunning = status === 'running';
-  const canAddCommand = !isRunning && program.length < level.maxCommands;
-  const completedSet = useMemo(
-    () => new Set(completedLevelIds),
-    [completedLevelIds],
-  );
+  const completedSet = useMemo(() => new Set(completedLevelIds), [completedLevelIds]);
   const totalLevels = PROGRAMMING_LEVELS.length;
   const completedCount = PROGRAMMING_LEVELS.filter((item) =>
     completedSet.has(item.id),
   ).length;
   const visibleUnlockedLevelCount = Math.min(
     totalLevels,
-    Math.max(
-      1,
-      unlockedLevelCount,
-      status === 'success' ? levelIndex + 2 : 0,
-    ),
+    Math.max(1, unlockedLevelCount, status === 'success' ? levelIndex + 2 : 0),
   );
   const progressLabel = `${levelIndex + 1}/${totalLevels}`;
   const isCurrentLevelCompleted = completedSet.has(level.id);
-  const programBlocks = useMemo(() => buildProgramBlocks(program), [program]);
-  const hasRequiredCommand =
-    !level.requiredCommand || program.includes(level.requiredCommand);
-  const world = useMemo(
-    () => ({
-      width: BOARD_SIZE,
-      height: BOARD_SIZE,
-      start: level.start,
-      direction: level.direction,
-      target: level.target,
-      obstacles: level.obstacles,
-    }),
-    [level],
-  );
-  const activeProgramStepIndex = useMemo(() => {
-    if (!activeBlockId) {
-      return null;
-    }
+  const requiredKinds = level.requiredKinds ?? [];
+  const hasRequiredCommand = requiredKinds.every((kind) => containsKind(program, kind));
+  const world = useMemo(() => buildWorld(level), [level]);
+  const progress =
+    executionFrames.length > 0
+      ? { current: frameCursor, total: executionFrames.length }
+      : null;
+  const isPlaybackPrepared =
+    status === 'running' && frameCursor > 0 && frameCursor < executionFrames.length;
+  const isProgramLocked = isPlaying || isPlaybackPrepared;
+  const canAddCommand = !isProgramLocked && program.length < level.maxCommands;
 
-    const match = programBlocks.findIndex(
-      (block) =>
-        block.id === activeBlockId || activeBlockId.startsWith(`${block.id}:`),
-    );
-    return match >= 0 ? match : null;
-  }, [activeBlockId, programBlocks]);
-  const currentStarThresholds = level.starThresholds ?? null;
   const evaluateRunStars = useCallback(
     (steps: number): 1 | 2 | 3 => {
-      if (!currentStarThresholds || !Number.isFinite(steps) || steps < 0) {
+      if (!level.starThresholds || !Number.isFinite(steps) || steps < 0) {
         return 1;
       }
 
-      return evaluateStars(Math.round(steps), currentStarThresholds);
+      return evaluateStars(Math.round(steps), level.starThresholds);
     },
-    [currentStarThresholds],
+    [level.starThresholds],
   );
 
   const resetLevelState = useCallback(
     (nextLevel: ProgrammingLevel) => {
       runIdRef.current += 1;
+      playbackActiveRef.current = false;
       setProgram([]);
       setBot(createStartBot(nextLevel));
       setVisitedKeys(new Set([positionKey(nextLevel.start)]));
+      setRemainingGems(nextLevel.gems ?? []);
       setStatus('idle');
       setActiveBlockId(null);
+      setExecutionFrames([]);
+      setFrameCursor(0);
+      setIsPlaying(false);
       setRunSummary(null);
       setMessage(nextLevel.prompt);
     },
@@ -411,84 +220,94 @@ export function ProgrammingIslandPage({
     return () => window.clearTimeout(timeoutId);
   }, [level, onSpeak, resetLevelState]);
 
-  const obstacleKeys = useMemo(
-    () => new Set(level.obstacles.map(positionKey)),
-    [level.obstacles],
-  );
+  const resetExecutionState = useCallback(() => {
+    runIdRef.current += 1;
+    playbackActiveRef.current = false;
+    setBot(createStartBot(level));
+    setVisitedKeys(new Set([positionKey(level.start)]));
+    setRemainingGems(level.gems ?? []);
+    setStatus('idle');
+    setActiveBlockId(null);
+    setExecutionFrames([]);
+    setFrameCursor(0);
+    setIsPlaying(false);
+    setRunSummary(null);
+  }, [level]);
 
-  const addCommand = useCallback(
-    (command: ProgrammingCommandId) => {
+  const addTemplate = useCallback(
+    (templateId: ProgrammingBlockTemplateId) => {
       if (!canAddCommand) {
         return;
       }
 
-      setProgram((current) => [...current, command]);
-      setStatus('idle');
-      setActiveBlockId(null);
+      blockCounterRef.current += 1;
+      const block = createBlockFromTemplate(
+        templateId,
+        `cmd-${Date.now().toString(36)}-${blockCounterRef.current}`,
+        { procedureId: level.defaultProcedureId },
+      );
+      setProgram((current) => [...current, block]);
+      resetExecutionState();
       setMessage('很好，把下一块也放进程序里。');
     },
-    [canAddCommand],
+    [canAddCommand, level.defaultProcedureId, resetExecutionState],
   );
 
-  const removeCommand = useCallback((index: number) => {
-    if (isRunning) {
-      return;
-    }
+  const removeBlock = useCallback(
+    (blockId: string) => {
+      if (isProgramLocked) {
+        return;
+      }
 
-    setProgram((current) => current.filter((_, itemIndex) => itemIndex !== index));
-    setStatus('idle');
-    setActiveBlockId(null);
-    setMessage('程序改好了，可以再运行一次。');
-  }, [isRunning]);
+      setProgram((current) => current.filter((block) => block.id !== blockId));
+      resetExecutionState();
+      setMessage('程序改好了，可以再运行一次。');
+    },
+    [isProgramLocked, resetExecutionState],
+  );
+
+  const reorderProgram = useCallback(
+    (nextProgram: Block[]) => {
+      if (isProgramLocked) {
+        return;
+      }
+
+      setProgram(nextProgram.map(cloneBlock));
+      resetExecutionState();
+      setMessage('顺序调好了，可以再运行一次。');
+    },
+    [isProgramLocked, resetExecutionState],
+  );
+
+  const updateBlock = useCallback(
+    (blockId: string, updater: (block: Block) => Block) => {
+      if (isProgramLocked) {
+        return;
+      }
+
+      setProgram((current) =>
+        current.map((block) => (block.id === blockId ? updater(block) : block)),
+      );
+      resetExecutionState();
+      setMessage('参数调好了，可以运行看看。');
+    },
+    [isProgramLocked, resetExecutionState],
+  );
 
   const clearProgram = useCallback(() => {
-    if (isRunning) {
+    if (isProgramLocked) {
       return;
     }
 
     setProgram([]);
-    setBot(createStartBot(level));
-    setVisitedKeys(new Set([positionKey(level.start)]));
-    setStatus('idle');
-    setActiveBlockId(null);
-    setRunSummary(null);
+    resetExecutionState();
     setMessage(level.prompt);
-  }, [isRunning, level]);
+  }, [isProgramLocked, level.prompt, resetExecutionState]);
 
-  const runProgram = useCallback(async () => {
-    if (isRunning) {
-      return;
-    }
-
-    if (program.length === 0) {
-      setMessage('先放一块指令，再让小满运行。');
-      onSpeak('先放一块指令，再让小满运行。');
-      return;
-    }
-
-    const runId = runIdRef.current + 1;
-    runIdRef.current = runId;
-    setStatus('running');
-    setActiveBlockId(null);
-    setRunSummary(null);
-    setBot(createStartBot(level));
-    setVisitedKeys(new Set([positionKey(level.start)]));
-    setMessage('小满开始照着程序走。');
-
-    const frames = buildExecutionFrames(programBlocks, world);
-    const finalFrame = frames[frames.length - 1];
-    const usedSteps = frames.length;
-    const finalStars = finalFrame?.status === 'success' && hasRequiredCommand
-      ? evaluateRunStars(usedSteps)
-      : 1;
-
-    for (const frame of frames) {
-      await wait(computeStepDelay(playbackSpeed));
-      if (runIdRef.current !== runId) {
-        return;
-      }
-
+  const applyFrame = useCallback(
+    (frame: ExecutionStep) => {
       setBot({ position: frame.bot.position, direction: frame.bot.direction });
+      setRemainingGems(frame.world.remainingGems);
       setActiveBlockId(frame.activeBlockId);
       setVisitedKeys((current) => {
         const next = new Set(current);
@@ -497,46 +316,155 @@ export function ProgrammingIslandPage({
       });
       setMessage(describeExecutionMessage(frame, level, hasRequiredCommand));
       setStatus(frame.status);
+    },
+    [hasRequiredCommand, level],
+  );
+
+  const prepareExecution = useCallback(() => {
+    if (program.length === 0) {
+      const emptyMessage = '先放一块指令，再让小满运行。';
+      setMessage(emptyMessage);
+      onSpeak(emptyMessage);
+      return null;
     }
 
-    const finalStatus =
-      finalFrame?.status === 'success' && hasRequiredCommand ? 'success' : 'blocked';
-    const finalMessage =
-      finalStatus === 'success'
-        ? level.successVoice
-        : hasRequiredCommand
-          ? level.hintVoice
-          : level.requiredCommandMessage ?? level.successVoice;
+    const frames = buildExecutionFrames(program, world);
+    setExecutionFrames(frames);
+    setFrameCursor(0);
+    setBot(createStartBot(level));
+    setVisitedKeys(new Set([positionKey(level.start)]));
+    setRemainingGems(level.gems ?? []);
+    setActiveBlockId(null);
+    setRunSummary(null);
+    setStatus('running');
+    setMessage('小满开始照着程序走。');
+    return frames;
+  }, [level, onSpeak, program, world]);
 
-    setStatus(finalStatus);
-    setActiveBlockId(finalFrame?.activeBlockId ?? null);
-    setMessage(finalMessage);
+  const completeExecution = useCallback(
+    (frames: ExecutionStep[]) => {
+      const finalFrame = frames[frames.length - 1];
+      const usedSteps = frames.length;
+      const finalStars =
+        finalFrame?.status === 'success' && hasRequiredCommand
+          ? evaluateRunStars(usedSteps)
+          : 1;
+      const finalStatus =
+        finalFrame?.status === 'success' && hasRequiredCommand ? 'success' : 'blocked';
+      const finalMessage =
+        finalStatus === 'success'
+          ? level.successVoice
+          : hasRequiredCommand
+            ? describeBlocked(finalFrame?.blockedReason, level)
+            : level.requiredCommandMessage ?? level.successVoice;
 
-    if (finalStatus === 'success') {
-      setRunSummary({ usedSteps, stars: finalStars });
-      onSpeak(level.successVoice);
-      onCompleteLevel(level, {
-        usedSteps,
-        stars: finalStars,
-        optimalSteps: level.optimalSteps ?? null,
-        requiredCommandSatisfied: hasRequiredCommand,
-        blockedReason: finalFrame?.blockedReason,
-      });
+      setStatus(finalStatus);
+      setActiveBlockId(finalFrame?.activeBlockId ?? null);
+      setMessage(finalMessage);
+      setFrameCursor(frames.length);
+
+      if (finalStatus === 'success') {
+        setRunSummary({ usedSteps, stars: finalStars });
+        onSpeak(level.successVoice);
+        onCompleteLevel(level, {
+          usedSteps,
+          stars: finalStars,
+          optimalSteps: level.optimalSteps ?? null,
+          requiredCommandSatisfied: hasRequiredCommand,
+          blockedReason: finalFrame?.blockedReason,
+        });
+        return;
+      }
+
+      setRunSummary(null);
+      onSpeak(finalMessage);
+    },
+    [evaluateRunStars, hasRequiredCommand, level, onCompleteLevel, onSpeak],
+  );
+
+  const runProgram = useCallback(async () => {
+    if (isPlaying) {
       return;
     }
 
-    setRunSummary(null);
-    onSpeak(finalMessage);
+    const shouldResume =
+      status === 'running' &&
+      executionFrames.length > 0 &&
+      frameCursor > 0 &&
+      frameCursor < executionFrames.length;
+    const frames = shouldResume ? executionFrames : prepareExecution();
+    if (!frames || frames.length === 0) {
+      return;
+    }
+
+    const startCursor = shouldResume ? frameCursor : 0;
+    const runId = runIdRef.current + 1;
+    runIdRef.current = runId;
+    playbackActiveRef.current = true;
+    setIsPlaying(true);
+
+    for (let index = startCursor; index < frames.length; index += 1) {
+      await wait(computeStepDelay(playbackSpeed));
+      if (!playbackActiveRef.current || runIdRef.current !== runId) {
+        return;
+      }
+
+      const frame = frames[index];
+      applyFrame(frame);
+      setFrameCursor(index + 1);
+    }
+
+    playbackActiveRef.current = false;
+    setIsPlaying(false);
+    completeExecution(frames);
   }, [
-    hasRequiredCommand,
-    evaluateRunStars,
-    isRunning,
-    level,
-    onCompleteLevel,
-    onSpeak,
+    applyFrame,
+    completeExecution,
+    executionFrames,
+    frameCursor,
+    isPlaying,
     playbackSpeed,
-    programBlocks,
-    world,
+    prepareExecution,
+    status,
+  ]);
+
+  const pauseProgram = useCallback(() => {
+    playbackActiveRef.current = false;
+    runIdRef.current += 1;
+    setIsPlaying(false);
+    setMessage('已暂停。可以单步看下一块，或继续运行。');
+  }, []);
+
+  const stepProgram = useCallback(() => {
+    if (isPlaying) {
+      return;
+    }
+
+    const shouldContinue =
+      status === 'running' &&
+      executionFrames.length > 0 &&
+      frameCursor < executionFrames.length;
+    const frames = shouldContinue ? executionFrames : prepareExecution();
+    const cursor = shouldContinue ? frameCursor : 0;
+    if (!frames || frames.length === 0 || cursor >= frames.length) {
+      return;
+    }
+
+    const frame = frames[cursor];
+    applyFrame(frame);
+    const nextCursor = cursor + 1;
+    setFrameCursor(nextCursor);
+    if (nextCursor >= frames.length) {
+      completeExecution(frames);
+    }
+  }, [
+    applyFrame,
+    completeExecution,
+    executionFrames,
+    frameCursor,
+    isPlaying,
+    prepareExecution,
+    status,
   ]);
 
   const goToLevel = useCallback(
@@ -555,15 +483,6 @@ export function ProgrammingIslandPage({
       setLevelIndex(boundedIndex);
     },
     [onSpeak, visibleUnlockedLevelCount],
-  );
-
-  const boardCells = useMemo(
-    () =>
-      Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => ({
-        x: index % BOARD_SIZE,
-        y: Math.floor(index / BOARD_SIZE),
-      })),
-    [],
   );
 
   return (
@@ -621,259 +540,79 @@ export function ProgrammingIslandPage({
               </button>
             </div>
 
-            <div className="mt-4 grid max-w-[34rem] grid-cols-5 gap-2">
-              {boardCells.map((cell) => {
-                const key = positionKey(cell);
-                const hasBot = samePosition(cell, bot.position);
-                const hasTarget = samePosition(cell, level.target);
-                const hasObstacle = obstacleKeys.has(key);
-                const hasVisited = visitedKeys.has(key);
+            <ProgrammingBoard
+              level={level}
+              bot={bot}
+              status={status}
+              visitedKeys={visitedKeys}
+              remainingGems={remainingGems}
+            />
 
-                return (
-                  <div
-                    key={key}
-                    className={`relative aspect-square rounded-[1.2rem] border text-center shadow-sm ring-1 ${
-                      hasObstacle
-                        ? 'border-slate-300 bg-slate-200 text-slate-600 ring-slate-300'
-                        : hasTarget
-                          ? 'border-amber-200 bg-amber-100 text-amber-700 ring-amber-200'
-                          : hasVisited
-                            ? 'border-emerald-200 bg-emerald-100 text-emerald-700 ring-emerald-200'
-                            : 'border-white bg-white/78 text-emerald-900 ring-white'
-                    }`}
-                  >
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      {hasObstacle ? (
-                        <span className="text-3xl">◆</span>
-                      ) : hasTarget ? (
-                        <Flag size={28} strokeWidth={3.2} />
-                      ) : null}
-                    </div>
-                    {hasBot ? (
-                      <motion.div
-                        layoutId="programming-bot"
-                        transition={SPRING.bounce}
-                        className="absolute inset-1 flex items-center justify-center rounded-[1rem] bg-gradient-to-b from-white to-sky-50 shadow-lg shadow-sky-300/40 ring-2 ring-sky-200"
-                      >
-                        <div className="relative h-[82%] w-[82%]">
-                          <LightHeroModel direction={bot.direction} status={status} />
-                          <div className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-sky-600 text-sm font-black text-white shadow-sm ring-2 ring-white">
-                            {DIRECTION_ARROW[bot.direction]}
-                          </div>
-                        </div>
-                      </motion.div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-
-              <div
-                className={`mt-4 rounded-[1.5rem] p-4 text-xl font-black leading-snug ring-1 ${
-                  status === 'success'
-                    ? 'bg-emerald-50 text-emerald-900 ring-emerald-200'
-                    : status === 'blocked'
+            <div
+              className={`mt-4 rounded-[1.5rem] p-4 text-xl font-black leading-snug ring-1 ${
+                status === 'success'
+                  ? 'bg-emerald-50 text-emerald-900 ring-emerald-200'
+                  : status === 'blocked'
                     ? 'bg-amber-50 text-amber-900 ring-amber-200'
                     : 'bg-white/78 text-emerald-950 ring-white'
-                }`}
-              >
-                {message}
-              </div>
-              {runSummary ? (
-                <div className="mt-3 rounded-[1.5rem] bg-emerald-50 px-4 py-3 text-base font-black text-emerald-800 ring-1 ring-emerald-100">
-                  本次运行 {runSummary.usedSteps} 步，成绩：{formatStarSummary(runSummary.stars)}
-                  {level.optimalSteps ? `（最优 ${level.optimalSteps} 步）` : ''}
-                </div>
-              ) : null}
+              }`}
+            >
+              {message}
             </div>
-
-          <div className="grid min-w-0 gap-4">
-            <div className="rounded-[2rem] bg-white/88 p-5 shadow-sm ring-1 ring-emerald-900/10">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-black text-emerald-700/80">
-                    指令积木
-                  </div>
-                  <h2 className="text-4xl font-black text-emerald-950">点一下加入程序</h2>
-                </div>
-                <div className="rounded-full bg-emerald-50 px-4 py-2 text-base font-black text-emerald-800 ring-1 ring-emerald-100">
-                  {program.length}/{level.maxCommands}
-                </div>
+            {runSummary ? (
+              <div className="mt-3 rounded-[1.5rem] bg-emerald-50 px-4 py-3 text-base font-black text-emerald-800 ring-1 ring-emerald-100">
+                本次运行 {runSummary.usedSteps} 步，成绩：{formatStarSummary(runSummary.stars)}
+                {level.optimalSteps ? `（最优 ${level.optimalSteps} 步）` : ''}
               </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {level.allowedCommands.map((command) => (
-                  <CommandButton
-                    key={command}
-                    command={command}
-                    onAdd={addCommand}
-                    disabled={!canAddCommand}
-                  />
-                ))}
-              </div>
-
-              {level.requiredCommand ? (
-                <div className="mt-4 flex items-center gap-3 rounded-[1.5rem] bg-rose-50 p-4 text-base font-black text-rose-800 ring-1 ring-rose-200">
-                  <Repeat2 size={24} strokeWidth={3.2} />
-                  本关目标：用一次 {COMMAND_META[level.requiredCommand].label}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="rounded-[2rem] bg-white/88 p-5 shadow-sm ring-1 ring-emerald-900/10">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-black text-emerald-700/80">
-                    程序
-                  </div>
-                  <h2 className="text-4xl font-black text-emerald-950">运行顺序</h2>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={clearProgram}
-                    disabled={isRunning || program.length === 0}
-                    className="inline-flex h-12 items-center gap-2 rounded-2xl bg-slate-50 px-4 text-base font-black text-slate-700 shadow-sm ring-1 ring-slate-200 disabled:opacity-45"
-                  >
-                    <RotateCcw size={20} strokeWidth={3.2} />
-                    重来
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onSpeak(level.hintVoice)}
-                    className="inline-flex h-12 items-center gap-2 rounded-2xl bg-amber-50 px-4 text-base font-black text-amber-800 shadow-sm ring-1 ring-amber-200"
-                  >
-                    <Lightbulb size={20} strokeWidth={3.2} />
-                    提示
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-5 min-h-24 rounded-[1.5rem] bg-emerald-50/70 p-3 ring-1 ring-emerald-100">
-                {program.length === 0 ? (
-                  <div className="flex h-20 items-center justify-center text-lg font-black text-emerald-800/60">
-                    指令会排在这里
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {program.map((command, index) => (
-                      <ProgramStep
-                        key={`${command}-${index}`}
-                        command={command}
-                        index={index}
-                        active={activeProgramStepIndex === index}
-                        disabled={isRunning}
-                        onRemove={removeCommand}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
-                <div className="grid grid-cols-3 gap-2">
-                  {SPEED_OPTIONS.map((option) => (
-                    <button
-                      type="button"
-                      key={option.value}
-                      onClick={() => setPlaybackSpeed(option.value)}
-                      disabled={isRunning}
-                      className={`inline-flex h-12 items-center justify-center rounded-xl border px-3 text-base font-black shadow-sm transition ${
-                        playbackSpeed === option.value
-                          ? 'border-emerald-400 bg-emerald-600 text-white ring-2 ring-emerald-300'
-                          : 'border-emerald-100 bg-white text-emerald-800'
-                      } disabled:opacity-45`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                <BigButton
-                  type="button"
-                  tone="success"
-                  disabled={isRunning}
-                  onClick={runProgram}
-                  className="flex items-center justify-center gap-3 rounded-[1.5rem] bg-emerald-600 px-6 py-4 text-2xl text-white shadow-lg shadow-emerald-900/15 ring-white"
-                >
-                  <Play size={30} fill="currentColor" strokeWidth={3.2} />
-                  运行
-                </BigButton>
-                <button
-                  type="button"
-                  onClick={() => goToLevel(levelIndex + 1)}
-                  disabled={
-                    (!isCurrentLevelCompleted && status !== 'success') ||
-                    levelIndex >= PROGRAMMING_LEVELS.length - 1 ||
-                    isRunning
-                  }
-                  className="inline-flex min-h-16 items-center justify-center gap-2 rounded-[1.5rem] bg-white px-5 text-lg font-black text-emerald-800 shadow-sm ring-1 ring-emerald-100 disabled:opacity-45"
-                >
-                  <CheckCircle2 size={22} strokeWidth={3.2} />
-                  下一关
-                </button>
-              </div>
-            </div>
+            ) : null}
           </div>
+
+          <ProgrammingEditor
+            allowedCommands={level.allowedCommands}
+            program={program}
+            activeBlockId={activeBlockId}
+            locked={isProgramLocked}
+            canAddCommand={canAddCommand}
+            requiredKinds={requiredKinds}
+            playbackSpeed={playbackSpeed}
+            isPlaying={isPlaying}
+            progress={progress}
+            onAddTemplate={addTemplate}
+            onRemoveBlock={removeBlock}
+            onReorderProgram={reorderProgram}
+            onUpdateBlock={updateBlock}
+            onClearProgram={clearProgram}
+            onRunProgram={runProgram}
+            onPauseProgram={pauseProgram}
+            onStepProgram={stepProgram}
+            onSpeedChange={setPlaybackSpeed}
+            onSpeakHint={() => onSpeak(level.hintVoice)}
+          />
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={() => goToLevel(levelIndex + 1)}
+            disabled={
+              (!isCurrentLevelCompleted && status !== 'success') ||
+              levelIndex >= PROGRAMMING_LEVELS.length - 1 ||
+              isPlaying
+            }
+            className="inline-flex min-h-16 items-center justify-center gap-2 rounded-[1.5rem] bg-white px-5 text-lg font-black text-emerald-800 shadow-sm ring-1 ring-emerald-100 disabled:opacity-45"
+          >
+            <CheckCircle2 size={22} strokeWidth={3.2} />
+            下一关
+          </button>
         </div>
       </section>
 
-      <section className="mt-4 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-sm ring-1 ring-emerald-900/10 backdrop-blur-xl">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-black text-emerald-700/80">关卡</div>
-            <h2 className="text-4xl font-black text-emerald-950">编程概念</h2>
-          </div>
-          <div className="rounded-full bg-emerald-50 px-4 py-2 text-base font-black text-emerald-800 ring-1 ring-emerald-100">
-            顺序 · 转向 · 调试 · 重复
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {PROGRAMMING_LEVELS.map((item, index) => {
-            const isActive = index === levelIndex;
-            const isCompleted = completedSet.has(item.id);
-            const isLocked = index >= visibleUnlockedLevelCount;
-
-            return (
-              <motion.button
-                key={item.id}
-                type="button"
-                whileHover={isLocked ? undefined : { y: -4 }}
-                whileTap={isLocked ? undefined : { scale: 0.97 }}
-                transition={SPRING.bounce}
-                onClick={() => goToLevel(index)}
-                aria-disabled={isLocked}
-                className={`min-h-32 rounded-[1.5rem] p-4 text-left shadow-sm ring-2 ${
-                  isActive
-                    ? 'bg-emerald-600 text-white ring-emerald-300'
-                    : isLocked
-                      ? 'bg-slate-50/82 text-slate-500 ring-slate-100'
-                      : isCompleted
-                        ? 'bg-emerald-50 text-emerald-950 ring-emerald-200'
-                        : 'bg-white/82 text-emerald-950 ring-white'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-black opacity-75">
-                    第 {index + 1} 关
-                  </div>
-                  {isLocked ? (
-                    <Lock size={20} strokeWidth={3.2} />
-                  ) : isCompleted ? (
-                    <CheckCircle2 size={20} strokeWidth={3.2} />
-                  ) : (
-                    <Route size={20} strokeWidth={3.2} />
-                  )}
-                </div>
-                <div className="mt-2 text-2xl font-black">{item.title}</div>
-                <div className="mt-3 inline-flex rounded-full bg-white/30 px-3 py-1 text-sm font-black ring-1 ring-current/20">
-                  {isLocked ? '未解锁' : item.concept}
-                </div>
-              </motion.button>
-            );
-          })}
-        </div>
-      </section>
+      <ProgrammingLevelPicker
+        levelIndex={levelIndex}
+        visibleUnlockedLevelCount={visibleUnlockedLevelCount}
+        completedLevelIds={completedSet}
+        onGoToLevel={goToLevel}
+      />
     </motion.section>
   );
 }

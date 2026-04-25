@@ -8,7 +8,8 @@ interface CardProps {
 export function Card({ children, className = '' }: PropsWithChildren<CardProps>) {
   return (
     <section
-      className={`${CARD} ${SHADOW.card} rounded-3xl ring-2 ring-white ${className}`}
+      style={{ boxShadow: SHADOW.card }}
+      className={`${CARD} rounded-3xl ring-2 ring-white ${className}`}
     >
       {children}
     </section>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'childlearn-shell-v2-20260425';
+const CACHE_NAME = 'childlearn-shell-v3-20260425';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -6,6 +6,8 @@ const SHELL_ASSETS = [
   '/manifest.webmanifest',
   '/icons/app-icon-192.png',
   '/icons/app-icon-512.png',
+  '/icons/app-icon-maskable-192.png',
+  '/icons/app-icon-maskable-512.png',
   '/characters/xiaoman/idle.svg',
   '/characters/xiaoman/happy.svg',
   '/characters/xiaoman/thinking.svg',
@@ -42,10 +44,13 @@ self.addEventListener('fetch', (event) => {
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put('/', copy.clone());
+            cache.put('/index.html', copy);
+          });
           return response;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match('/index.html').then((cached) => cached ?? caches.match('/'))),
     );
     return;
   }

@@ -1,15 +1,35 @@
-import type { Block, ExecutionStep, InterpreterWorld, Program, ProgrammingDirection } from './types';
-import { hasReachedTarget, isInsideWorld, isObstacle, nextPosition, turnLeft, turnRight } from './worldOps';
+import type {
+  Block,
+  BotState,
+  CommandKind,
+  ExecutionStep,
+  InterpreterWorld,
+  Program,
+} from './types';
+import {
+  canGoForward,
+  canOccupy,
+  collectGemAt,
+  hasGemAt,
+  hasReachedTarget,
+  isInsideWorld,
+  isObstacle,
+  jumpPosition,
+  nextPosition,
+  turnLeft,
+  turnRight,
+} from './worldOps';
 
 interface FrameState {
   blocks: Block[];
   index: number;
   loopLeft?: number;
+  whileKind?: 'whileNotGoal';
+  parentBlockId?: string;
 }
 
-function samePosition(left: { x: number; y: number }, right: { x: number; y: number }) {
-  return left.x === right.x && left.y === right.y;
-}
+const DEFAULT_MAX_STEPS = 160;
+const DEFAULT_MAX_OPERATIONS = 1200;
 
 function normalizeRepeatCount(value: unknown): number {
   const n = Number(value);
@@ -19,9 +39,48 @@ function normalizeRepeatCount(value: unknown): number {
   return Math.max(0, Math.floor(n));
 }
 
-function moveForward(world: InterpreterWorld, bot: { position: { x: number; y: number }; direction: ProgrammingDirection }) {
-  const candidate = nextPosition(bot.position, bot.direction);
+function makeWorldFrame(remainingGems: Map<string, { x: number; y: number }>) {
+  return {
+    remainingGems: [...remainingGems.values()],
+  };
+}
 
+function gemKey(position: { x: number; y: number }) {
+  return `${position.x}:${position.y}`;
+}
+
+function makeStep({
+  block,
+  bot,
+  remainingGems,
+  status,
+  blockedReason,
+}: {
+  block: Block;
+  bot: BotState;
+  remainingGems: Map<string, { x: number; y: number }>;
+  status: ExecutionStep['status'];
+  blockedReason?: ExecutionStep['blockedReason'];
+}): ExecutionStep {
+  return {
+    activeBlockId: block.id,
+    command: block.kind,
+    status,
+    bot,
+    world: makeWorldFrame(remainingGems),
+    blockedReason,
+  };
+}
+
+function hasCompleted(world: InterpreterWorld, bot: BotState, remainingGems: Map<string, { x: number; y: number }>) {
+  return hasReachedTarget(world, bot) && (!world.requiresAllGems || remainingGems.size === 0);
+}
+
+function moveTo(
+  world: InterpreterWorld,
+  bot: BotState,
+  candidate: { x: number; y: number },
+) {
   if (!isInsideWorld(world, candidate)) {
     return { bot, blocked: true as const, blockedReason: 'wall' as const };
   }
@@ -39,7 +98,7 @@ function moveForward(world: InterpreterWorld, bot: { position: { x: number; y: n
   };
 }
 
-function executeRepeat(block: Block, frames: FrameState[]) {
+function pushRepeat(block: Block, frames: FrameState[]) {
   const loops = normalizeRepeatCount(block.params?.n);
   if (loops <= 0) {
     return;
@@ -49,33 +108,62 @@ function executeRepeat(block: Block, frames: FrameState[]) {
     blocks: block.body ?? [],
     index: 0,
     loopLeft: loops,
+    parentBlockId: block.id,
   });
 }
 
-function executeIfPath(bot: { position: { x: number; y: number }; direction: ProgrammingDirection }, block: Block, world: InterpreterWorld, frames: FrameState[]) {
-  const next = nextPosition(bot.position, bot.direction);
-  const canGo =
-    isInsideWorld(world, next) &&
-    !isObstacle(world, next);
+function pushWhile(block: Block, frames: FrameState[]) {
   frames.push({
-    blocks: canGo ? block.branchTrue ?? [] : block.branchFalse ?? [],
+    blocks: block.body ?? [],
     index: 0,
+    whileKind: 'whileNotGoal',
+    parentBlockId: block.id,
+  });
+}
+
+function pushBranch(block: Block, frames: FrameState[], branch: Block[] | undefined) {
+  frames.push({
+    blocks: branch ?? [],
+    index: 0,
+    parentBlockId: block.id,
   });
 }
 
 export function* interpret(program: Program, world: InterpreterWorld): Generator<ExecutionStep> {
   const stack: FrameState[] = [{ blocks: program, index: 0 }];
-  let bot = {
+  const remainingGems = new Map(
+    (world.gems ?? []).map((gem) => [gemKey(gem), gem]),
+  );
+  let bot: BotState = {
     position: world.start,
     direction: world.direction,
   };
+  let yieldedSteps = 0;
+  let operations = 0;
+  const maxSteps = world.maxSteps ?? DEFAULT_MAX_STEPS;
+  const maxOperations = world.maxOperations ?? DEFAULT_MAX_OPERATIONS;
+  let lastBlock: Block | null = null;
 
   while (stack.length) {
+    operations += 1;
+    if (operations > maxOperations) {
+      yield makeStep({
+        block: lastBlock ?? { id: 'program', kind: 'whileNotGoal' },
+        bot,
+        remainingGems,
+        status: 'blocked',
+        blockedReason: 'maxSteps',
+      });
+      return;
+    }
+
     const top = stack[stack.length - 1];
 
     if (top.index >= top.blocks.length) {
       if (top.loopLeft !== undefined && top.loopLeft > 1) {
         top.loopLeft -= 1;
+        top.index = 0;
+      } else if (top.whileKind === 'whileNotGoal' && !hasCompleted(world, bot, remainingGems)) {
         top.index = 0;
       } else {
         stack.pop();
@@ -87,28 +175,61 @@ export function* interpret(program: Program, world: InterpreterWorld): Generator
     if (!block?.id) {
       continue;
     }
+    lastBlock = block;
+
+    if (yieldedSteps >= maxSteps) {
+      yield makeStep({
+        block,
+        bot,
+        remainingGems,
+        status: 'blocked',
+        blockedReason: 'maxSteps',
+      });
+      return;
+    }
+
+    const yieldAndMaybeStop = function* (
+      status: ExecutionStep['status'],
+      blockedReason?: ExecutionStep['blockedReason'],
+    ) {
+      yieldedSteps += 1;
+      yield makeStep({
+        block,
+        bot,
+        remainingGems,
+        status,
+        blockedReason,
+      });
+      return status === 'success' || status === 'blocked';
+    };
 
     if (block.kind === 'forward') {
-      const moveResult = moveForward(world, bot);
-      if (!moveResult.blocked) {
-        bot = moveResult.bot;
-        yield {
-          activeBlockId: block.id,
-          command: 'forward',
-          status: hasReachedTarget(world, bot) ? 'success' : 'running',
-          bot,
-        };
-        if (hasReachedTarget(world, bot)) {
-          return;
-        }
-      } else {
-        yield {
-          activeBlockId: block.id,
-          command: 'forward',
-          status: 'blocked',
-          bot,
-          blockedReason: moveResult.blockedReason,
-        };
+      const moveResult = moveTo(world, bot, nextPosition(bot.position, bot.direction));
+      if (moveResult.blocked) {
+        yield* yieldAndMaybeStop('blocked', moveResult.blockedReason);
+        return;
+      }
+
+      bot = moveResult.bot;
+      const done = hasCompleted(world, bot, remainingGems);
+      yield* yieldAndMaybeStop(done ? 'success' : 'running');
+      if (done) {
+        return;
+      }
+      continue;
+    }
+
+    if (block.kind === 'jump') {
+      const moveResult = moveTo(world, bot, jumpPosition(bot.position, bot.direction));
+      if (moveResult.blocked) {
+        yield* yieldAndMaybeStop('blocked', moveResult.blockedReason);
+        return;
+      }
+
+      bot = moveResult.bot;
+      const done = hasCompleted(world, bot, remainingGems);
+      yield* yieldAndMaybeStop(done ? 'success' : 'running');
+      if (done) {
         return;
       }
       continue;
@@ -119,12 +240,10 @@ export function* interpret(program: Program, world: InterpreterWorld): Generator
         ...bot,
         direction: turnLeft(bot.direction),
       };
-      yield {
-        activeBlockId: block.id,
-        command: 'turnLeft',
-        status: 'running',
-        bot,
-      };
+      yield* yieldAndMaybeStop(hasCompleted(world, bot, remainingGems) ? 'success' : 'running');
+      if (hasCompleted(world, bot, remainingGems)) {
+        return;
+      }
       continue;
     }
 
@@ -133,43 +252,75 @@ export function* interpret(program: Program, world: InterpreterWorld): Generator
         ...bot,
         direction: turnRight(bot.direction),
       };
-      yield {
-        activeBlockId: block.id,
-        command: 'turnRight',
-        status: 'running',
-        bot,
-      };
+      yield* yieldAndMaybeStop(hasCompleted(world, bot, remainingGems) ? 'success' : 'running');
+      if (hasCompleted(world, bot, remainingGems)) {
+        return;
+      }
+      continue;
+    }
+
+    if (block.kind === 'collect') {
+      if (!hasGemAt([...remainingGems.values()], bot.position)) {
+        yield* yieldAndMaybeStop('blocked', 'missingGem');
+        return;
+      }
+
+      const nextGems = collectGemAt([...remainingGems.values()], bot.position);
+      remainingGems.clear();
+      nextGems.forEach((gem) => remainingGems.set(gemKey(gem), gem));
+      const done = hasCompleted(world, bot, remainingGems);
+      yield* yieldAndMaybeStop(done ? 'success' : 'running');
+      if (done) {
+        return;
+      }
       continue;
     }
 
     if (block.kind === 'repeat') {
-      executeRepeat(block, stack);
+      pushRepeat(block, stack);
       continue;
     }
 
     if (block.kind === 'ifPath') {
-      executeIfPath(bot, block, world, stack);
+      pushBranch(block, stack, canGoForward(world, bot) ? block.branchTrue : block.branchFalse);
       continue;
     }
 
-    if (block.kind === 'ifGem' || block.kind === 'collect') {
-      yield {
-        activeBlockId: block.id,
-        command: block.kind,
-        status: 'running',
-        bot,
-      };
+    if (block.kind === 'ifGem') {
+      pushBranch(
+        block,
+        stack,
+        hasGemAt([...remainingGems.values()], bot.position)
+          ? block.branchTrue
+          : block.branchFalse,
+      );
       continue;
     }
 
-    if (block.kind === 'procCall' || block.kind === 'whileNotGoal' || block.kind === 'jump') {
-      // Reserved for later stages.
+    if (block.kind === 'whileNotGoal') {
+      if (!hasCompleted(world, bot, remainingGems)) {
+        pushWhile(block, stack);
+      }
       continue;
     }
+
+    if (block.kind === 'procCall') {
+      const procedureId = block.params?.procedureId ?? block.params?.commandId ?? 'main';
+      const procedure = world.procedures?.[procedureId];
+      if (!procedure) {
+        yield* yieldAndMaybeStop('blocked', 'unknownProcedure');
+        return;
+      }
+
+      pushBranch(block, stack, procedure);
+      continue;
+    }
+
+    const _exhaustive: CommandKind = block.kind;
+    void _exhaustive;
   }
 }
 
 export function buildExecutionFrames(program: Block[], world: InterpreterWorld): ExecutionStep[] {
   return Array.from(interpret(program, world));
 }
-

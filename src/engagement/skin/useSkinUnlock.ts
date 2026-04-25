@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
+import type { GradientStops } from '../../theme/tokens';
+import { BG } from '../../theme/tokens';
 
 export interface Skin {
   id: string;
   name: string;
   unlocked: boolean;
-  gradient: string;
+  gradient: GradientStops;
 }
 
 export function useSkinUnlock(stars: number, maxCombo: number, totalCorrect: number) {
@@ -14,37 +16,37 @@ export function useSkinUnlock(stars: number, maxCombo: number, totalCorrect: num
         id: 'orchard',
         name: '果园',
         unlocked: true,
-        gradient: 'from-emerald-200 via-lime-200 to-yellow-200',
+        gradient: BG.mint,
       },
       {
         id: 'rainbow',
         name: '彩虹',
         unlocked: totalCorrect >= 10,
-        gradient: 'from-sky-200 via-blue-300 to-indigo-400',
+        gradient: ['#BAE6FD', '#93C5FD', '#818CF8'],
       },
       {
         id: 'candy',
         name: '糖果',
         unlocked: maxCombo >= 5,
-        gradient: 'from-pink-200 via-purple-300 to-indigo-400',
+        gradient: ['#FBCFE8', '#C4B5FD', '#818CF8'],
       },
       {
         id: 'forest',
         name: '森林',
         unlocked: stars >= 25,
-        gradient: 'from-emerald-200 via-teal-300 to-cyan-400',
+        gradient: ['#A7F3D0', '#5EEAD4', '#22D3EE'],
       },
       {
         id: 'space',
         name: '宇宙',
         unlocked: stars >= 40,
-        gradient: 'from-slate-900 via-purple-900 to-indigo-900',
+        gradient: ['#0F172A', '#581C87', '#312E81'],
       },
       {
         id: 'sunset',
         name: '晚霞',
         unlocked: totalCorrect >= 30,
-        gradient: 'from-orange-200 via-pink-300 to-rose-400',
+        gradient: ['#FED7AA', '#F9A8D4', '#FB7185'],
       },
     ],
     [maxCombo, stars, totalCorrect],

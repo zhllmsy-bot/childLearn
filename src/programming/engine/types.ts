@@ -23,6 +23,7 @@ export interface Block {
   params?: {
     n?: number;
     commandId?: string;
+    procedureId?: string;
   };
   body?: Block[];
   branchTrue?: Block[];
@@ -30,6 +31,7 @@ export interface Block {
 }
 
 export type Program = Block[];
+export type Procedures = Record<string, Program>;
 
 export interface InterpreterWorld {
   width: number;
@@ -38,6 +40,11 @@ export interface InterpreterWorld {
   direction: ProgrammingDirection;
   target: ProgrammingPosition;
   obstacles: ProgrammingPosition[];
+  gems?: ProgrammingPosition[];
+  requiresAllGems?: boolean;
+  procedures?: Procedures;
+  maxSteps?: number;
+  maxOperations?: number;
 }
 
 export interface BotState {
@@ -46,13 +53,24 @@ export interface BotState {
 }
 
 export type ExecutionStatus = 'running' | 'blocked' | 'success';
+export type BlockedReason =
+  | 'wall'
+  | 'obstacle'
+  | 'missingGem'
+  | 'unknownProcedure'
+  | 'maxSteps';
+
+export interface RuntimeWorldState {
+  remainingGems: ProgrammingPosition[];
+}
 
 export interface ExecutionStep {
   activeBlockId: string;
   command: CommandKind;
   status: ExecutionStatus;
   bot: BotState;
-  blockedReason?: 'wall' | 'obstacle';
+  world: RuntimeWorldState;
+  blockedReason?: BlockedReason;
 }
 
 export interface WorldFrameEvent {
@@ -61,4 +79,3 @@ export interface WorldFrameEvent {
   activeBlockId: string;
   bot: BotState;
 }
-

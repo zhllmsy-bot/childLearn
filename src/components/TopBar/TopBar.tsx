@@ -4,13 +4,12 @@ import { SPRING } from '../../theme/springs';
 import { XiaomanSprite } from '../_primitives/XiaomanSprite';
 
 interface TopBarProps {
-  combo: number;
   themeName: string;
   onHome: () => void;
   onSound: () => void;
 }
 
-export function TopBar({ combo, themeName, onHome, onSound }: TopBarProps) {
+export function TopBar({ themeName, onHome, onSound }: TopBarProps) {
   return (
     <>
       <motion.button
@@ -20,9 +19,9 @@ export function TopBar({ combo, themeName, onHome, onSound }: TopBarProps) {
         whileTap={{ scale: 0.9 }}
         transition={SPRING.bounce}
         aria-label="回到首页"
-        className="safe-control-top-left ipad-floating-button fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-emerald-700 shadow-xl shadow-emerald-500/30 ring-2 ring-white"
+        className="safe-control-top-left ipad-floating-button fixed z-30 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-white text-emerald-700 shadow-xl shadow-emerald-500/30 ring-2 ring-white"
       >
-        <Home size={30} strokeWidth={3.5} />
+        <Home size={34} strokeWidth={3.5} />
       </motion.button>
 
       <motion.div
@@ -44,23 +43,10 @@ export function TopBar({ combo, themeName, onHome, onSound }: TopBarProps) {
         whileTap={{ scale: 0.95 }}
         transition={SPRING.bounce}
         aria-label="播放语音"
-        className="safe-control-top-left-stack ipad-floating-button fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-amber-600 shadow-xl shadow-amber-500/30 ring-2 ring-white"
+        className="safe-control-top-left-stack ipad-floating-button fixed z-30 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-white text-amber-600 shadow-xl shadow-amber-500/30 ring-2 ring-white"
       >
-        <Volume2 size={30} strokeWidth={3.5} />
+        <Volume2 size={34} strokeWidth={3.5} />
       </motion.button>
-
-      {combo > 0 ? (
-        <motion.div
-          key={combo}
-          initial={{ scale: 0, x: 20 }}
-          animate={{ scale: 1, x: 0 }}
-          exit={{ scale: 0 }}
-          transition={SPRING.bounce}
-          className="safe-control-top-right-stack fixed z-30 max-w-[calc(100vw-8rem)] whitespace-nowrap rounded-full bg-[#FFECB0] px-4 py-2 text-base font-black text-[#183024] shadow-xl shadow-[#FFB200]/30 ring-2 ring-white md:text-2xl"
-        >
-          连对 {combo}
-        </motion.div>
-      ) : null}
     </>
   );
 }

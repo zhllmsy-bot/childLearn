@@ -106,6 +106,14 @@
 - [x] 完成 App 奖励闭环初版接入（new-completion 幂等处理已加入）。
 - [x] 完成花园/贴纸编程触发接口。
 
+## R4 收口执行入口
+
+- [x] 以 `docs/r4-full-optimization-spec.md` 为本轮执行 spec。
+- [x] 将一维 `ProgrammingCommandId[]` UI 状态升级为 `Program = Block[]`。
+- [x] 让新增关卡真实覆盖 `ifPath` / `ifGem` / `collect` / `whileNotGoal` / `jump` / `procCall`。
+- [x] 用 `@dnd-kit/*` 建立点击、拖拽、键盘三可达编辑器。
+- [x] 编程岛页面拆分到 Editor / Board / LevelPicker / helpers。
+
 ## 下一步执行顺序（建议）
 
 1. **P0 完整执行**：交互控制（暂停/单步）→ 步数上限与失败回放 → 条件指令执行稳定化。  
@@ -113,4 +121,3 @@
 3. **P1~P2 内容扩充**：地图模型与 26 关世界包。  
 4. **P2 视觉换代**：Sprite/Lottie + 等轴测地图。  
 5. **收官**：完整回归测试 + 发布前验收。
-

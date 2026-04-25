@@ -3,7 +3,14 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Flag, Star } from 'lucide-react';
 import type { Question } from '../../curriculum/types';
 import { SPRING } from '../../theme/springs';
-import { CARD, SHADOW, TEXT_GRADIENT } from '../../theme/tokens';
+import {
+  ACCENT,
+  CARD,
+  SEMANTIC,
+  SHADOW,
+  TEXT_GRADIENT,
+  linearGradient,
+} from '../../theme/tokens';
 import { Badge } from '../_primitives/Badge';
 
 interface QuestionCardProps {
@@ -39,19 +46,30 @@ const CARD_BODY_SUCCESS_MOTION = {
   filter: 'blur(0px)',
 };
 
-const OBJECT_TOKEN_CLASS = [
-  'from-[#7FC86A] to-[#3EA02D] shadow-[#3EA02D]/28',
-  'from-[#FFD257] to-[#FFB200] shadow-[#FFB200]/30',
-  'from-[#7BBBFF] to-[#2E8CF0] shadow-[#2E8CF0]/24',
-  'from-[#FFA47A] to-[#F77444] shadow-[#F77444]/22',
+const OBJECT_TOKEN_STYLE = [
+  {
+    backgroundImage: linearGradient([...ACCENT.success].reverse() as [string, string], '135deg'),
+    boxShadow: `0 12px 22px ${SEMANTIC.correct.shadow}`,
+  },
+  {
+    backgroundImage: linearGradient([...ACCENT.gold].reverse() as [string, string], '135deg'),
+    boxShadow: `0 12px 22px ${SEMANTIC.hint.shadow}`,
+  },
+  {
+    backgroundImage: linearGradient([...ACCENT.primary].reverse() as [string, string], '135deg'),
+    boxShadow: `0 12px 22px ${SEMANTIC.primary.shadow}`,
+  },
+  {
+    backgroundImage: linearGradient([...ACCENT.danger].reverse() as [string, string], '135deg'),
+    boxShadow: `0 12px 22px ${SEMANTIC.wrong.shadow}`,
+  },
 ] as const;
 
 function ObjectToken({ index }: { index: number }) {
   return (
     <span
-      className={`inline-block h-11 w-11 rounded-full bg-gradient-to-br shadow-lg ring-2 ring-white md:h-12 md:w-12 ${
-        OBJECT_TOKEN_CLASS[index % OBJECT_TOKEN_CLASS.length]
-      }`}
+      className="inline-block h-11 w-11 rounded-full shadow-lg ring-2 ring-white md:h-12 md:w-12"
+      style={OBJECT_TOKEN_STYLE[index % OBJECT_TOKEN_STYLE.length]}
       aria-hidden="true"
     />
   );
@@ -387,7 +405,8 @@ function QuestionCardComponent({ question, answered }: QuestionCardProps) {
       <motion.div
         animate={shouldCelebrate ? CARD_BODY_SUCCESS_MOTION : { opacity: 1, scale: 1 }}
         transition={shouldCelebrate ? CARD_SUCCESS_TIMING : SPRING.enter}
-        className={`${CARD} ${SHADOW.mint} flex w-full flex-col items-center gap-5 rounded-3xl p-5 text-center ring-2 ring-white md:gap-6 md:p-8`}
+        style={{ boxShadow: SHADOW.mint }}
+        className={`${CARD} flex w-full flex-col items-center gap-5 rounded-3xl p-5 text-center ring-2 ring-white md:gap-6 md:p-8`}
       >
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Badge>Level {question.level}</Badge>

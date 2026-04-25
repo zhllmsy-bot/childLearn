@@ -9,27 +9,27 @@ function getComboConfig(combo: number) {
   if (combo >= 15) {
     return {
       text: `连对 ${combo}`,
-      tone: 'bg-[#FFECB0] text-[#183024] ring-[#FFD257]',
+      tone: 'bg-child-coral text-white ring-child-peach shadow-child-coral/30',
     };
   }
 
   if (combo >= 10) {
     return {
       text: `连对 ${combo}`,
-      tone: 'bg-[#FFECB0] text-[#183024] ring-[#FFD257]',
+      tone: 'bg-child-sun text-child-ink ring-child-gold-soft',
     };
   }
 
   if (combo >= 5) {
     return {
       text: `连对 ${combo}`,
-      tone: 'bg-[#EAF9E6] text-[#1E6B13] ring-[#C8EDBC]',
+      tone: 'bg-child-mint text-child-leaf-dark ring-child-mint-deep',
     };
   }
 
   return {
     text: `连对 ${combo}`,
-    tone: 'bg-white text-[#1E6B13] ring-[#C8EDBC]',
+    tone: 'bg-white text-child-leaf-dark ring-child-mint-deep',
   };
 }
 

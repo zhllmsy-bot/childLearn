@@ -5,6 +5,8 @@ describe('english items', () => {
   it('keeps every card usable for the english module', () => {
     const ids = new Set<string>();
 
+    expect(ENGLISH_ITEMS.length).toBeGreaterThanOrEqual(26);
+
     ENGLISH_ITEMS.forEach((item) => {
       ids.add(item.id);
       expect(item.glyph.length).toBeGreaterThan(0);

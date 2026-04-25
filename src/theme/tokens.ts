@@ -1,75 +1,115 @@
-export const BG = {
-  mint: 'from-[#FFF9EF] via-[#EAF9E6] to-[#FFECB0]',
-  sky: 'from-[#EAF4FF] via-[#C2E0FF] to-[#EAF9E6]',
-  sunset: 'from-[#FFF1EA] via-[#FFD9C2] to-[#FFECB0]',
-  candy: 'from-[#FCEEFA] via-[#FFD9C2] to-[#EAF4FF]',
-  forest: 'from-[#EAF9E6] via-[#C8EDBC] to-[#EAF4FF]',
-  space: 'from-[#183024] via-[#1457AE] to-[#7F2C71]',
+import type { CSSProperties } from 'react';
+
+export type GradientStops = readonly [string, string] | readonly [string, string, string];
+
+export const PALETTE = {
+  cream: '#FFF9EF',
+  mint: '#EAF9E6',
+  mintDeep: '#C8EDBC',
+  leaf: '#3EA02D',
+  leafDark: '#1E6B13',
+  sky: '#EAF4FF',
+  skyMid: '#C2E0FF',
+  blue: '#2E8CF0',
+  blueSoft: '#7BBBFF',
+  sun: '#FFECB0',
+  gold: '#FFB200',
+  goldSoft: '#FFD257',
+  peach: '#FFD9C2',
+  coral: '#F77444',
+  coralSoft: '#FFA47A',
+  plum: '#7F2C71',
+  magic: '#C85AB5',
+  magicSoft: '#EC8FDE',
+  ink: '#183024',
 } as const;
+
+export const BG = {
+  mint: [PALETTE.cream, PALETTE.mint, PALETTE.sun],
+  sky: [PALETTE.sky, PALETTE.skyMid, PALETTE.mint],
+  sunset: ['#FFF1EA', PALETTE.peach, PALETTE.sun],
+  candy: ['#FCEEFA', PALETTE.peach, PALETTE.sky],
+  forest: [PALETTE.mint, PALETTE.mintDeep, PALETTE.sky],
+  space: [PALETTE.ink, '#1457AE', PALETTE.plum],
+} as const satisfies Record<string, GradientStops>;
 
 export const ACCENT = {
-  primary: 'from-[#2E8CF0] to-[#7BBBFF]',
-  success: 'from-[#3EA02D] to-[#7FC86A]',
-  danger: 'from-[#F77444] to-[#FFA47A]',
-  gold: 'from-[#FFB200] to-[#FFD257]',
-  magic: 'from-[#C85AB5] to-[#EC8FDE]',
-} as const;
+  primary: [PALETTE.blue, PALETTE.blueSoft],
+  success: [PALETTE.leaf, '#7FC86A'],
+  danger: [PALETTE.coral, PALETTE.coralSoft],
+  gold: [PALETTE.gold, PALETTE.goldSoft],
+  magic: [PALETTE.magic, PALETTE.magicSoft],
+} as const satisfies Record<string, readonly [string, string]>;
 
 export const SHADOW = {
-  card: 'shadow-2xl shadow-emerald-500/16',
-  mint: 'shadow-2xl shadow-emerald-500/20',
-  glow: 'shadow-xl shadow-amber-400/50',
-  hot: 'shadow-2xl shadow-emerald-400/60',
-  danger: 'shadow-2xl shadow-[#F77444]/45',
-  combo: 'shadow-xl shadow-orange-500/50',
+  card: '0 24px 60px rgba(16, 185, 129, 0.16)',
+  mint: '0 24px 60px rgba(16, 185, 129, 0.20)',
+  glow: '0 18px 38px rgba(251, 191, 36, 0.50)',
+  hot: '0 24px 60px rgba(52, 211, 153, 0.60)',
+  danger: '0 24px 60px rgba(247, 116, 68, 0.45)',
+  combo: '0 18px 38px rgba(249, 115, 22, 0.50)',
 } as const;
 
 export const RADIUS = {
-  sm: 'rounded-xl',
-  md: 'rounded-2xl',
-  lg: 'rounded-3xl',
-  xl: 'rounded-[2rem]',
-  pill: 'rounded-full',
+  sm: 12,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  pill: 999,
 } as const;
 
 export const TYPE = {
-  hero: 'text-5xl md:text-6xl font-extrabold leading-tight tracking-normal',
-  display: 'text-4xl md:text-5xl font-extrabold tracking-normal',
-  title: 'text-3xl md:text-4xl font-extrabold tracking-normal',
-  body: 'text-lg md:text-xl font-bold tracking-normal',
-  caption: 'text-base font-bold tracking-normal',
+  hero: { fontSize: 56, lineHeight: 1.05, weight: 800 },
+  display: { fontSize: 44, lineHeight: 1.08, weight: 800 },
+  title: { fontSize: 32, lineHeight: 1.12, weight: 800 },
+  body: { fontSize: 20, lineHeight: 1.35, weight: 700 },
+  caption: { fontSize: 16, lineHeight: 1.35, weight: 700 },
 } as const;
 
 export const SPACE = {
-  xs: 'gap-2',
-  sm: 'gap-4',
-  md: 'gap-6',
-  lg: 'gap-8',
+  xs: 8,
+  sm: 16,
+  md: 24,
+  lg: 32,
 } as const;
 
 export const ELEV = {
-  soft: 'shadow-lg shadow-emerald-500/15',
-  card: 'shadow-2xl shadow-emerald-500/20',
-  hero: 'shadow-[0_28px_60px_-12px_rgba(16,185,129,0.35),0_12px_24px_-8px_rgba(251,191,36,0.25)]',
-  press: 'shadow-md shadow-emerald-900/10',
+  soft: '0 16px 34px rgba(16, 185, 129, 0.15)',
+  card: '0 24px 60px rgba(16, 185, 129, 0.20)',
+  hero:
+    '0 28px 60px -12px rgba(16, 185, 129, 0.35), 0 12px 24px -8px rgba(251, 191, 36, 0.25)',
+  press: '0 10px 22px rgba(6, 78, 59, 0.10)',
 } as const;
 
 export const SCENE = {
-  calm: 'from-emerald-100 via-teal-50 to-sky-100',
-  focus: 'from-amber-50 via-lime-100 to-emerald-100',
-  celebrate: 'from-[#FFECB0] via-[#FFD9C2] to-[#EAF9E6]',
-  challenge: 'from-[#EAF4FF] via-[#C2E0FF] to-[#EAF9E6]',
-  night: 'from-slate-800 via-indigo-900 to-purple-950',
-} as const;
+  calm: ['#D1FAE5', '#F0FDFA', '#E0F2FE'],
+  focus: ['#FFFBEB', '#ECFCCB', '#D1FAE5'],
+  celebrate: [PALETTE.sun, PALETTE.peach, PALETTE.mint],
+  challenge: [PALETTE.sky, PALETTE.skyMid, PALETTE.mint],
+  night: ['#1E293B', '#312E81', '#3B0764'],
+} as const satisfies Record<string, GradientStops>;
 
 export const SEMANTIC = {
-  correct: { bg: '#3EA02D', ring: '#C8EDBC', shadow: '#3EA02D66' },
-  wrong: { bg: '#F77444', ring: '#FFD9C2', shadow: '#F7744466' },
-  hint: { bg: '#FFB200', ring: '#FFECB0', shadow: '#FFB20066' },
-  primary: { bg: '#2E8CF0', ring: '#C2E0FF', shadow: '#2E8CF055' },
+  correct: { bg: PALETTE.leaf, ring: PALETTE.mintDeep, shadow: '#3EA02D66' },
+  wrong: { bg: PALETTE.coral, ring: PALETTE.peach, shadow: '#F7744466' },
+  hint: { bg: PALETTE.gold, ring: PALETTE.sun, shadow: '#FFB20066' },
+  primary: { bg: PALETTE.blue, ring: PALETTE.skyMid, shadow: '#2E8CF055' },
 } as const;
 
 export const CARD = 'bg-[#FFF9EF]/90 backdrop-blur-xl';
 
 export const TEXT_GRADIENT =
-  'bg-gradient-to-r from-[#3EA02D] via-[#2E8CF0] to-[#FFB200] bg-clip-text text-transparent';
+  'bg-gradient-to-r from-child-leaf via-child-blue to-child-gold bg-clip-text text-transparent';
+
+export function linearGradient(
+  stops: GradientStops,
+  direction = '180deg',
+): string {
+  return `linear-gradient(${direction}, ${stops.join(', ')})`;
+}
+
+export function gradientStyle(stops: GradientStops, direction = '180deg'): CSSProperties {
+  return {
+    backgroundImage: linearGradient(stops, direction),
+  };
+}

@@ -3,16 +3,32 @@ import { evaluateStars } from './starEvaluator';
 
 describe('starEvaluator', () => {
   it('returns three stars at or before the first threshold', () => {
-    expect(evaluateStars(3, [3, 5, 7])).toBe(3);
-    expect(evaluateStars(4, [3, 5, 7])).toBe(2);
+    const thresholds = {
+      threeStarsMaxSteps: 3,
+      twoStarsMaxSteps: 5,
+      oneStarMaxSteps: 7,
+    };
+
+    expect(evaluateStars(3, thresholds)).toBe(3);
+    expect(evaluateStars(4, thresholds)).toBe(2);
   });
 
   it('returns two stars between middle thresholds', () => {
-    expect(evaluateStars(5, [3, 5, 7])).toBe(2);
-    expect(evaluateStars(6, [3, 5, 7])).toBe(1);
+    const thresholds = {
+      threeStarsMaxSteps: 3,
+      twoStarsMaxSteps: 5,
+      oneStarMaxSteps: 7,
+    };
+
+    expect(evaluateStars(5, thresholds)).toBe(2);
+    expect(evaluateStars(6, thresholds)).toBe(1);
   });
 
   it('returns one star beyond the second threshold', () => {
-    expect(evaluateStars(8, [3, 5, 7])).toBe(1);
+    expect(evaluateStars(8, {
+      threeStarsMaxSteps: 3,
+      twoStarsMaxSteps: 5,
+      oneStarMaxSteps: 7,
+    })).toBe(1);
   });
 });

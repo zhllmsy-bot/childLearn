@@ -5,6 +5,8 @@ describe('literacy items', () => {
   it('keeps every card usable for the literacy module', () => {
     const ids = new Set<string>();
 
+    expect(LITERACY_ITEMS.length).toBeGreaterThanOrEqual(24);
+
     LITERACY_ITEMS.forEach((item) => {
       ids.add(item.id);
       expect(item.glyph).toHaveLength(1);
