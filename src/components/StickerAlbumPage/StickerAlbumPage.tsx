@@ -152,7 +152,7 @@ export function StickerAlbumPage({
             ) : null}
           </div>
 
-          <aside className="flex min-w-0 flex-col justify-between gap-3 rounded-[1.5rem] bg-gradient-to-br from-[#2E8CF0] to-[#3EA02D] p-4 text-white shadow-xl shadow-sky-500/25">
+          <aside className="flex min-w-0 flex-col justify-between gap-3 rounded-[1.5rem] bg-gradient-to-br from-child-blue to-child-leaf p-4 text-white shadow-xl shadow-sky-500/25">
             {latestSticker ? (
               <motion.button
                 type="button"

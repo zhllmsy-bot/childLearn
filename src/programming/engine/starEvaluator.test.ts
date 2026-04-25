@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateStars } from './starEvaluator';
+import { evaluateStars, explainStarRating } from './starEvaluator';
 
 describe('starEvaluator', () => {
   it('returns three stars at or before the first threshold', () => {
@@ -30,5 +30,19 @@ describe('starEvaluator', () => {
       twoStarsMaxSteps: 5,
       oneStarMaxSteps: 7,
     })).toBe(1);
+  });
+
+  it('explains why a run earned its stars', () => {
+    expect(explainStarRating(6, {
+      threeStarsMaxSteps: 4,
+      twoStarsMaxSteps: 6,
+      oneStarMaxSteps: 8,
+    })).toEqual({
+      stars: 2,
+      usedSteps: 6,
+      targetSteps: 4,
+      stepsOverThreeStarTarget: 2,
+      reason: 'within_two_star_target',
+    });
   });
 });

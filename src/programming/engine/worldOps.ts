@@ -87,6 +87,13 @@ export function collectGemAt(gems: ProgrammingPosition[], position: ProgrammingP
   return gems.filter((gem) => !samePosition(gem, position));
 }
 
+export function collectOnTile(gems: ProgrammingPosition[], position: ProgrammingPosition) {
+  return {
+    collected: hasGemAt(gems, position),
+    remainingGems: collectGemAt(gems, position),
+  };
+}
+
 export function hasReachedTarget(world: InterpreterWorld, bot: BotState) {
   return samePosition(bot.position, world.target);
 }

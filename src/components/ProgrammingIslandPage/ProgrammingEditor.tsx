@@ -333,6 +333,9 @@ function ProgrammingEditorComponent({
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     const activeType = active.data.current?.type;
     if (activeType === 'palette') {
+      if (!over || (over.id !== 'program-dropzone' && !programIds.includes(String(over.id)))) {
+        return;
+      }
       const templateId = active.data.current?.templateId as ProgrammingBlockTemplateId;
       onAddTemplate(templateId);
       return;

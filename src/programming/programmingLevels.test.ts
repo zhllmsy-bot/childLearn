@@ -20,7 +20,7 @@ function levelWorld(level: (typeof PROGRAMMING_LEVELS)[number]) {
 
 describe('programming levels', () => {
   it('ships enough levels to exercise interpreter concepts', () => {
-    expect(PROGRAMMING_LEVELS.length).toBeGreaterThanOrEqual(10);
+    expect(PROGRAMMING_LEVELS.length).toBeGreaterThanOrEqual(25);
     const requiredKinds = new Set(
       PROGRAMMING_LEVELS.flatMap((level) => level.requiredKinds ?? []),
     );
@@ -37,6 +37,25 @@ describe('programming levels', () => {
 
     expectedKinds.forEach((kind) => {
       expect(requiredKinds.has(kind)).toBe(true);
+    });
+  });
+
+  it('keeps the 5-world progression annotated for curriculum planning', () => {
+    const worlds = new Set(PROGRAMMING_LEVELS.map((level) => level.worldId));
+
+    expect(worlds).toEqual(new Set(['forest', 'meadow', 'cave', 'canyon', 'tower']));
+    worlds.forEach((worldId) => {
+      const worldLevels = PROGRAMMING_LEVELS.filter((level) => level.worldId === worldId);
+      expect(worldLevels.length).toBeGreaterThanOrEqual(5);
+      expect(worldLevels.some((level) => level.isBoss), worldId).toBe(true);
+    });
+
+    PROGRAMMING_LEVELS.forEach((level) => {
+      expect(level.conceptTags.length, level.id).toBeGreaterThan(0);
+      expect(level.difficultyStars, level.id).toBeGreaterThanOrEqual(1);
+      expect(level.difficultyStars, level.id).toBeLessThanOrEqual(5);
+      expect(level.optimalSteps, level.id).toBeGreaterThan(0);
+      expect(level.starThresholds, level.id).toBeTruthy();
     });
   });
 

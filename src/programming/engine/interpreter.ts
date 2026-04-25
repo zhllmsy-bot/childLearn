@@ -8,8 +8,7 @@ import type {
 } from './types';
 import {
   canGoForward,
-  canOccupy,
-  collectGemAt,
+  collectOnTile,
   hasGemAt,
   hasReachedTarget,
   isInsideWorld,
@@ -26,10 +25,12 @@ interface FrameState {
   loopLeft?: number;
   whileKind?: 'whileNotGoal';
   parentBlockId?: string;
+  callDepth?: number;
 }
 
 const DEFAULT_MAX_STEPS = 160;
 const DEFAULT_MAX_OPERATIONS = 1200;
+const DEFAULT_MAX_CALL_DEPTH = 12;
 
 function normalizeRepeatCount(value: unknown): number {
   const n = Number(value);
@@ -121,11 +122,17 @@ function pushWhile(block: Block, frames: FrameState[]) {
   });
 }
 
-function pushBranch(block: Block, frames: FrameState[], branch: Block[] | undefined) {
+function pushBranch(
+  block: Block,
+  frames: FrameState[],
+  branch: Block[] | undefined,
+  callDepth = 0,
+) {
   frames.push({
     blocks: branch ?? [],
     index: 0,
     parentBlockId: block.id,
+    callDepth,
   });
 }
 
@@ -142,6 +149,7 @@ export function* interpret(program: Program, world: InterpreterWorld): Generator
   let operations = 0;
   const maxSteps = world.maxSteps ?? DEFAULT_MAX_STEPS;
   const maxOperations = world.maxOperations ?? DEFAULT_MAX_OPERATIONS;
+  const maxCallDepth = world.maxCallDepth ?? DEFAULT_MAX_CALL_DEPTH;
   let lastBlock: Block | null = null;
 
   while (stack.length) {
@@ -260,14 +268,14 @@ export function* interpret(program: Program, world: InterpreterWorld): Generator
     }
 
     if (block.kind === 'collect') {
-      if (!hasGemAt([...remainingGems.values()], bot.position)) {
+      const collected = collectOnTile([...remainingGems.values()], bot.position);
+      if (!collected.collected) {
         yield* yieldAndMaybeStop('blocked', 'missingGem');
         return;
       }
 
-      const nextGems = collectGemAt([...remainingGems.values()], bot.position);
       remainingGems.clear();
-      nextGems.forEach((gem) => remainingGems.set(gemKey(gem), gem));
+      collected.remainingGems.forEach((gem) => remainingGems.set(gemKey(gem), gem));
       const done = hasCompleted(world, bot, remainingGems);
       yield* yieldAndMaybeStop(done ? 'success' : 'running');
       if (done) {
@@ -312,7 +320,13 @@ export function* interpret(program: Program, world: InterpreterWorld): Generator
         return;
       }
 
-      pushBranch(block, stack, procedure);
+      const nextCallDepth = (top.callDepth ?? 0) + 1;
+      if (nextCallDepth > maxCallDepth) {
+        yield* yieldAndMaybeStop('blocked', 'maxCallDepth');
+        return;
+      }
+
+      pushBranch(block, stack, procedure, nextCallDepth);
       continue;
     }
 

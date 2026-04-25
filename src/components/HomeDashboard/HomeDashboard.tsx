@@ -63,16 +63,16 @@ function MapButton({
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.97 }}
       transition={SPRING.smooth}
-      className="flex min-h-[88px] items-center gap-4 rounded-[1.75rem] bg-[#FFF9EF] px-5 py-4 text-left shadow-[0_2px_0_rgba(24,48,36,.06),0_10px_24px_rgba(24,48,36,.10)] ring-2 ring-white"
+      className="flex min-h-[88px] items-center gap-4 rounded-[1.75rem] bg-child-cream px-5 py-4 text-left shadow-child-ink/10 ring-2 ring-white"
     >
-      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] bg-[#EAF9E6] text-[#1E6B13] ring-1 ring-[#C8EDBC]">
+      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] bg-child-mint text-child-leaf-dark ring-1 ring-child-mint-deep">
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="block text-2xl font-black leading-tight text-[#183024]">
+        <span className="block text-2xl font-black leading-tight text-child-ink">
           {label}
         </span>
-        <span className="mt-1 block truncate text-base font-bold text-[#556B5A]">
+        <span className="mt-1 block truncate text-base font-bold text-child-moss">
           {meta}
         </span>
       </span>
@@ -129,25 +129,25 @@ function HomeDashboardComponent({
       <section className="kid-surface relative overflow-hidden rounded-[2rem] p-5 shadow-[0_4px_0_rgba(24,48,36,.06),0_18px_44px_rgba(24,48,36,.12)] ring-2 ring-white md:p-7">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-center">
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#EAF9E6] px-4 py-2 text-base font-black text-[#1E6B13] ring-1 ring-[#C8EDBC]">
+            <div className="inline-flex items-center gap-2 rounded-full bg-child-mint px-4 py-2 text-base font-black text-child-leaf-dark ring-1 ring-child-mint-deep">
               <Sparkles size={19} strokeWidth={3} />
               果园伙伴 小满
             </div>
-            <h1 className="mt-4 text-5xl font-black leading-[1.05] tracking-normal text-[#183024] md:text-6xl">
+            <h1 className="mt-4 text-5xl font-black leading-[1.05] tracking-normal text-child-ink md:text-6xl">
               今天练 5 道？
             </h1>
-            <p className="mt-3 max-w-2xl text-lg font-bold leading-relaxed text-[#556B5A] md:text-xl">
+            <p className="mt-3 max-w-2xl text-lg font-bold leading-relaxed text-child-moss md:text-xl">
               Lv.{difficulty} · {rankName} · 小星 {stars}
             </p>
 
             <div className="mt-5 max-w-xl">
-              <div className="flex items-center justify-between gap-3 text-base font-black text-[#1E6B13]">
+              <div className="flex items-center justify-between gap-3 text-base font-black text-child-leaf-dark">
                 <span>本轮进度</span>
                 <span>{safeLevelProgress}/{levelGoal}</span>
               </div>
-              <div className="mt-2 h-4 overflow-hidden rounded-full bg-white ring-1 ring-[#C8EDBC]">
+              <div className="mt-2 h-4 overflow-hidden rounded-full bg-white ring-1 ring-child-mint-deep">
                 <div
-                  className="h-full rounded-full bg-[#3EA02D]"
+                  className="h-full rounded-full bg-child-leaf"
                   style={{ width: `${progressPercent(safeLevelProgress, levelGoal)}%` }}
                 />
               </div>
@@ -163,7 +163,7 @@ function HomeDashboardComponent({
                 <Play size={34} fill="currentColor" strokeWidth={3.2} />
                 {zhCN.home.primaryAction}
               </BigButton>
-              <span className="rounded-full bg-white px-4 py-2 text-base font-black text-[#556B5A] ring-1 ring-[#C8EDBC]">
+              <span className="rounded-full bg-white px-4 py-2 text-base font-black text-child-moss ring-1 ring-child-mint-deep">
                 还差 {remaining} 题
               </span>
             </div>
@@ -201,60 +201,60 @@ function HomeDashboardComponent({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="rounded-[1.75rem] bg-white/88 p-5 shadow-sm ring-1 ring-[#C8EDBC]">
+        <div className="rounded-[1.75rem] bg-white/88 p-5 shadow-sm ring-1 ring-child-mint-deep">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-black text-[#183024]">今日状态</h2>
-              <p className="mt-1 text-base font-bold text-[#556B5A]">
+              <h2 className="text-2xl font-black text-child-ink">今日状态</h2>
+              <p className="mt-1 text-base font-bold text-child-moss">
                 正确率 {accuracy}% · 最佳连击 {Math.max(currentCombo, maxCombo)}
               </p>
             </div>
-            <div className="rounded-full bg-[#EAF9E6] px-4 py-2 text-base font-black text-[#1E6B13] ring-1 ring-[#C8EDBC]">
+            <div className="rounded-full bg-child-mint px-4 py-2 text-base font-black text-child-leaf-dark ring-1 ring-child-mint-deep">
               果灵 {unlockedSpiritCount}/10
             </div>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-[1.25rem] bg-[#EAF9E6] p-4 text-[#183024] ring-1 ring-[#C8EDBC]">
+            <div className="rounded-[1.25rem] bg-child-mint p-4 text-child-ink ring-1 ring-child-mint-deep">
               <Star size={26} strokeWidth={3} />
               <div className="mt-2 text-xl font-black">{rankName}</div>
-              <div className="text-sm font-bold text-[#556B5A]">段位</div>
+              <div className="text-sm font-bold text-child-moss">段位</div>
             </div>
-            <div className="rounded-[1.25rem] bg-[#FFECB0] p-4 text-[#183024] ring-1 ring-[#FFD257]">
+            <div className="rounded-[1.25rem] bg-child-sun p-4 text-child-ink ring-1 ring-child-gold-soft">
               <Trophy size={26} strokeWidth={3} />
               <div className="mt-2 text-xl font-black">{garden.treeStage.name}</div>
-              <div className="text-sm font-bold text-[#556B5A]">
+              <div className="text-sm font-bold text-child-moss">
                 连续 {garden.streak} 天
               </div>
             </div>
-            <div className="rounded-[1.25rem] bg-[#EAF4FF] p-4 text-[#183024] ring-1 ring-[#C2E0FF]">
+            <div className="rounded-[1.25rem] bg-child-sky p-4 text-child-ink ring-1 ring-child-sky-mid">
               <Sparkles size={26} strokeWidth={3} />
               <div className="mt-2 text-xl font-black">{unlockedSkinCount}</div>
-              <div className="text-sm font-bold text-[#556B5A]">主题已解锁</div>
+              <div className="text-sm font-bold text-child-moss">主题已解锁</div>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[1.75rem] bg-white/88 p-5 shadow-sm ring-1 ring-[#C8EDBC]">
-          <div className="text-base font-black text-[#1E6B13]">最近贴纸</div>
+        <div className="rounded-[1.75rem] bg-white/88 p-5 shadow-sm ring-1 ring-child-mint-deep">
+          <div className="text-base font-black text-child-leaf-dark">最近贴纸</div>
           {latestSticker ? (
             <button
               type="button"
               onClick={() => onInspectSticker(latestSticker)}
               aria-label={`查看最新贴纸 ${latestSticker.name}`}
-              className="mt-3 flex w-full items-center gap-3 rounded-[1.25rem] bg-[#FFF9EF] p-3 text-left ring-1 ring-[#FFECB0]"
+              className="mt-3 flex w-full items-center gap-3 rounded-[1.25rem] bg-child-cream p-3 text-left ring-1 ring-child-sun"
             >
               <StickerArtwork sticker={latestSticker} className="h-16 w-16 rounded-2xl" />
               <span className="min-w-0">
-                <span className="block truncate text-lg font-black text-[#183024]">
+                <span className="block truncate text-lg font-black text-child-ink">
                   {latestSticker.name}
                 </span>
-                <span className="text-sm font-bold text-[#556B5A]">
+                <span className="text-sm font-bold text-child-moss">
                   重复光片 {duplicateShards}
                 </span>
               </span>
             </button>
           ) : (
-            <div className="mt-3 rounded-[1.25rem] bg-[#FFF9EF] p-4 text-base font-bold text-[#556B5A] ring-1 ring-[#FFECB0]">
+            <div className="mt-3 rounded-[1.25rem] bg-child-cream p-4 text-base font-bold text-child-moss ring-1 ring-child-sun">
               完成一次挑战后，小满会把新贴纸放到这里。
             </div>
           )}

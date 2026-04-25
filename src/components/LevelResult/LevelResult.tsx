@@ -76,18 +76,18 @@ function RewardChest({
   const visibleSpirits = newSpirits.slice(0, 6);
   const hiddenSpiritCount = Math.max(newSpirits.length - visibleSpirits.length, 0);
   const chestTone = {
-    sprout: 'from-[#C8EDBC] to-[#EAF9E6]',
-    rainbow: 'from-[#C2E0FF] to-[#F7CFEF]',
-    sun: 'from-[#FFECB0] to-[#FFD9C2]',
+    sprout: 'from-child-mint-deep to-child-mint',
+    rainbow: 'from-child-sky-mid to-child-rose-mist',
+    sun: 'from-child-sun to-child-peach',
   }[reward.chestTier];
 
   return (
     <div
-      className={`relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br ${chestTone} p-4 text-left text-[#183024] shadow-xl ring-2 ring-white`}
+      className={`relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br ${chestTone} p-4 text-left text-child-ink shadow-xl ring-2 ring-white`}
     >
       <div className="relative grid gap-4 md:grid-cols-[1fr_1.1fr] md:items-center">
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/70 text-[#3EA02D] shadow-sm ring-2 ring-white">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/70 text-child-leaf shadow-sm ring-2 ring-white">
             <Gift size={34} strokeWidth={3.2} />
           </div>
           <div>
@@ -163,7 +163,7 @@ export function LevelResult({
         <div className="relative flex flex-col items-center gap-4">
           <div className="relative flex items-center justify-center">
             <XiaomanSprite emotion="cheer" className="h-32 w-32 drop-shadow-xl" />
-            <span className="absolute -right-2 top-2 flex h-14 w-14 items-center justify-center rounded-full bg-[#FFB200] text-3xl font-black text-white shadow-xl ring-4 ring-white">
+            <span className="absolute -right-2 top-2 flex h-14 w-14 items-center justify-center rounded-full bg-child-gold text-3xl font-black text-white shadow-xl ring-4 ring-white">
               {rating}
             </span>
           </div>
@@ -181,7 +181,7 @@ export function LevelResult({
               <span
                 key={index}
                 className={
-                  index < earnedStars ? 'text-[#FFB200]' : 'text-[#183024]/20'
+                  index < earnedStars ? 'text-child-gold' : 'text-child-ink/20'
                 }
               >
                 <Star size={34} fill="currentColor" strokeWidth={2.8} />

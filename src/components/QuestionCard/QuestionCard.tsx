@@ -340,7 +340,7 @@ function NumberLineView({ question }: { question: Question }) {
       <div className="flex items-center justify-between">
         {steps.map((step) => (
           <div key={step} className="flex flex-col items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center text-[#3EA02D]" aria-hidden="true">
+            <span className="flex h-8 w-8 items-center justify-center text-child-leaf" aria-hidden="true">
               {step === question.numberLine!.start ? (
                 <Flag size={26} strokeWidth={3} fill="currentColor" />
               ) : step === question.numberLine!.end ? (

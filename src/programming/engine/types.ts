@@ -45,6 +45,7 @@ export interface InterpreterWorld {
   procedures?: Procedures;
   maxSteps?: number;
   maxOperations?: number;
+  maxCallDepth?: number;
 }
 
 export interface BotState {
@@ -58,7 +59,8 @@ export type BlockedReason =
   | 'obstacle'
   | 'missingGem'
   | 'unknownProcedure'
-  | 'maxSteps';
+  | 'maxSteps'
+  | 'maxCallDepth';
 
 export interface RuntimeWorldState {
   remainingGems: ProgrammingPosition[];

@@ -1,13 +1,13 @@
 # R4 全量优化执行 Spec
 
-> 日期：2026-04-25  
+> 日期：2026-04-26  
 > 基线：`c6f3f5a feat: 更新编程模块与视觉设计`  
 > 目标：把 R4 评审中暴露的“编程岛能力错位、主应用过重、token 半抽象、combo/触达/PWA 细节、内容丰度不足”一次收口到可验证状态。
 
 ## 成功标准
 
 - 编程岛使用 `Block[]` 树形程序作为唯一运行模型，不再以扁平 `ProgrammingCommandId[]` 作为 UI 状态。
-- 解释器能力被真实关卡覆盖：至少新增 6 关，覆盖 `repeat(n)`、`ifPath`、`collect`，并让 `ifGem`、`whileNotGoal`、`jump`、`procCall` 不再只是空实现。
+- 解释器能力被真实关卡覆盖：关卡扩至 30 关，覆盖 `repeat(n)`、`ifPath`、`collect`、`ifGem`、`whileNotGoal`、`jump`、`procCall`。
 - 编程编辑器支持点击添加、拖拽添加、拖拽重排、键盘排序和删除；`ProgrammingIslandPage` 拆成页面容器 + Board + Editor + LevelPicker 等子组件。
 - `App.tsx` 主文件瘦身到 800 行以内，练习流/导航/语音/编程奖励进入独立 hook 或组件。
 - `BG`、`ACCENT`、`SHADOW`、`RADIUS`、`TYPE`、`SPACE` 变为数值/hex/rgba token；Tailwind 主题消费同一套命名颜色，组件不再把 semantic 色值硬编码在 QuestionCard 内。
@@ -24,7 +24,7 @@
 - [x] 增加 `createBlockFromTemplate`，统一 UI 添加、拖拽添加、测试样例和关卡默认块。
 - [x] 扩展 `InterpreterWorld`：支持 `gems`、`procedures`、动态尺寸和最大步数防护。
 - [x] 解释器实现 `collect`、`ifGem`、`whileNotGoal`、`jump`、`procCall`，并输出世界态与失败原因。
-- [x] 增加 10 关首批内容，其中新增 6 关覆盖条件、收集、循环、跳跃、过程调用。
+- [x] 增加到 30 关内容，覆盖 5 个世界、Boss/挑战关、条件、收集、循环、跳跃、过程调用。
 - [x] 把 `starThresholds` 改为命名对象，消除 `[three,two,one]` 反直觉配置。
 
 ### P0/P1 编程岛交互与拆分
@@ -33,6 +33,7 @@
 - [x] 支持 palette 拖到程序区、程序区排序、删除、清空、`repeat(n)` 参数调整。
 - [x] 新增 `ProgrammingBoard.tsx` 和 `ProgrammingLevelPicker.tsx`，把页面文件降到容器职责。
 - [x] 保留速度档位，新增单步执行和进度条；播放中禁止结构编辑。
+- [x] palette 拖拽仅在程序区落点生效，避免误拖到空白处添加指令。
 
 ### P0 App 架构收敛
 
@@ -54,9 +55,9 @@
 
 ### P1 内容与质量
 
-- [x] 识字扩展到 24 张，英语扩展到 26 张。
+- [x] 识字扩展到 24 张，英语扩展到 26 张；编程扩展到 30 关。
 - [x] 内容测试检查数量、id 唯一、词条字段完整。
-- [x] 补齐解释器、worldOps、starEvaluator、编程关卡数据测试。
+- [x] 补齐解释器、worldOps、starEvaluator、编程关卡数据测试，覆盖 106 条测试。
 - [x] 运行 `npm test`、`npm run build`、`npm run dev -- --host 0.0.0.0 --port 5173 --strictPort`。
 
 ## 非目标

@@ -27,7 +27,7 @@ function LevelProgressStrip({ current, total }: { current: number; total: number
 
   return (
     <div className="mx-auto w-full rounded-3xl bg-white/88 p-4 shadow-lg shadow-emerald-500/10 ring-2 ring-white backdrop-blur-xl">
-      <div className="mb-3 flex items-center justify-between gap-3 text-base font-black text-[#183024]">
+      <div className="mb-3 flex items-center justify-between gap-3 text-base font-black text-child-ink">
         <span>本关</span>
         <span>{safeCurrent}/{total}</span>
       </div>
@@ -39,7 +39,7 @@ function LevelProgressStrip({ current, total }: { current: number; total: number
           <span
             key={index}
             className={`h-5 rounded-full ring-1 ring-white ${
-              index < safeCurrent ? 'bg-[#3EA02D]' : 'bg-[#EAF9E6]'
+              index < safeCurrent ? 'bg-child-leaf' : 'bg-child-mint'
             }`}
           />
         ))}

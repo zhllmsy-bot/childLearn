@@ -10,18 +10,24 @@ export const PALETTE = {
   leafDark: '#1E6B13',
   sky: '#EAF4FF',
   skyMid: '#C2E0FF',
+  ocean: '#1457AE',
   blue: '#2E8CF0',
   blueSoft: '#7BBBFF',
+  creamWarm: '#FFF7E1',
   sun: '#FFECB0',
   gold: '#FFB200',
   goldSoft: '#FFD257',
+  amberInk: '#7A5100',
   peach: '#FFD9C2',
   coral: '#F77444',
   coralSoft: '#FFA47A',
+  coralInk: '#8F3514',
   plum: '#7F2C71',
   magic: '#C85AB5',
   magicSoft: '#EC8FDE',
+  roseMist: '#F7CFEF',
   ink: '#183024',
+  moss: '#556B5A',
 } as const;
 
 export const BG = {
@@ -96,7 +102,7 @@ export const SEMANTIC = {
   primary: { bg: PALETTE.blue, ring: PALETTE.skyMid, shadow: '#2E8CF055' },
 } as const;
 
-export const CARD = 'bg-[#FFF9EF]/90 backdrop-blur-xl';
+export const CARD = 'bg-child-cream/90 backdrop-blur-xl';
 
 export const TEXT_GRADIENT =
   'bg-gradient-to-r from-child-leaf via-child-blue to-child-gold bg-clip-text text-transparent';

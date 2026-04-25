@@ -15,7 +15,7 @@ import {
 import { buildExecutionFrames } from '../../programming/engine/interpreter';
 import type { Block, BlockedReason, ExecutionStep, InterpreterWorld } from '../../programming/engine/types';
 import { cloneBlock, containsKind, createBlockFromTemplate, type ProgrammingBlockTemplateId } from '../../programming/blocks';
-import { evaluateStars } from '../../programming/engine/starEvaluator';
+import { evaluateStars, explainStarRating } from '../../programming/engine/starEvaluator';
 import { positionKey } from '../../programming/engine/worldOps';
 import { SPRING } from '../../theme/springs';
 import { ProgrammingBoard } from './ProgrammingBoard';
@@ -46,6 +46,7 @@ export interface ProgrammingCompletionResult {
 interface RunSummary {
   usedSteps: number;
   stars: 1 | 2 | 3;
+  starNote: string;
 }
 
 const BASE_STEP_DELAY_MS = 620;
@@ -66,6 +67,19 @@ function formatStarSummary(stars: 1 | 2 | 3) {
   const filled = '★★★'.slice(0, stars);
   const empty = '☆☆☆'.slice(stars);
   return `${filled}${empty}`;
+}
+
+function formatStarNote(steps: number, level: ProgrammingLevel) {
+  if (!level.starThresholds) {
+    return '完成后会记录本次路线。';
+  }
+
+  const trace = explainStarRating(steps, level.starThresholds);
+  if (trace.stars === 3) {
+    return `三星目标 ${trace.targetSteps} 步内，刚好完成。`;
+  }
+
+  return `三星目标 ${trace.targetSteps} 步内，本次多 ${trace.stepsOverThreeStarTarget} 步。`;
 }
 
 function computeStepDelay(speed: PlaybackSpeed) {
@@ -364,7 +378,7 @@ export function ProgrammingIslandPage({
       setFrameCursor(frames.length);
 
       if (finalStatus === 'success') {
-        setRunSummary({ usedSteps, stars: finalStars });
+        setRunSummary({ usedSteps, stars: finalStars, starNote: formatStarNote(usedSteps, level) });
         onSpeak(level.successVoice);
         onCompleteLevel(level, {
           usedSteps,
@@ -563,6 +577,9 @@ export function ProgrammingIslandPage({
               <div className="mt-3 rounded-[1.5rem] bg-emerald-50 px-4 py-3 text-base font-black text-emerald-800 ring-1 ring-emerald-100">
                 本次运行 {runSummary.usedSteps} 步，成绩：{formatStarSummary(runSummary.stars)}
                 {level.optimalSteps ? `（最优 ${level.optimalSteps} 步）` : ''}
+                <span className="mt-1 block text-sm text-emerald-700/80">
+                  {runSummary.starNote}
+                </span>
               </div>
             ) : null}
           </div>

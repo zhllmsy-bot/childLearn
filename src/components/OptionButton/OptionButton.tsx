@@ -19,10 +19,10 @@ interface OptionButtonProps {
 }
 
 const IDLE_PALETTE = [
-  'bg-[#EAF4FF] text-[#1457AE] shadow-[#2E8CF0]/18 ring-[#C2E0FF]',
-  'bg-[#EAF9E6] text-[#1E6B13] shadow-[#3EA02D]/18 ring-[#C8EDBC]',
-  'bg-[#FFF7E1] text-[#7A5100] shadow-[#FFB200]/22 ring-[#FFECB0]',
-  'bg-[#FFF1EA] text-[#8F3514] shadow-[#F77444]/18 ring-[#FFD9C2]',
+  'bg-child-sky text-child-ocean shadow-child-blue/20 ring-child-sky-mid',
+  'bg-child-mint text-child-leaf-dark shadow-child-leaf/20 ring-child-mint-deep',
+  'bg-child-cream-warm text-child-amber-ink shadow-child-gold/25 ring-child-sun',
+  'bg-orange-50 text-child-coral-ink shadow-child-coral/20 ring-child-peach',
 ] as const;
 
 const stateClass: Record<Exclude<OptionVisualState, 'idle'>, string> = {

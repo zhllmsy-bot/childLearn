@@ -247,4 +247,28 @@ describe('interpreter', () => {
       blockedReason: 'maxSteps',
     });
   });
+
+  it('guards recursive procedure calls with maxCallDepth', () => {
+    const frames = buildExecutionFrames(
+      [{ id: 'call', kind: 'procCall', params: { procedureId: 'loop' } }],
+      {
+        width: 3,
+        height: 3,
+        start: { x: 0, y: 0 },
+        direction: 'east',
+        target: { x: 2, y: 2 },
+        obstacles: [],
+        maxCallDepth: 2,
+        procedures: {
+          loop: [{ id: 'loop-call', kind: 'procCall', params: { procedureId: 'loop' } }],
+        },
+      },
+    );
+
+    expect(frames[frames.length - 1]).toMatchObject({
+      activeBlockId: 'loop-call',
+      status: 'blocked',
+      blockedReason: 'maxCallDepth',
+    });
+  });
 });

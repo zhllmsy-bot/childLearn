@@ -4,6 +4,7 @@ import { Flag, Gem } from 'lucide-react';
 import type { ProgrammingLevel, ProgrammingPosition } from '../../programming/programmingLevels';
 import { positionKey, samePosition } from '../../programming/engine/worldOps';
 import { SPRING } from '../../theme/springs';
+import { XiaomanSprite, type XiaomanEmotion } from '../_primitives/XiaomanSprite';
 import { DIRECTION_ARROW, DIRECTION_ROTATE, type BotViewState, type RunStatus } from './programmingViewTypes';
 
 interface ProgrammingBoardProps {
@@ -14,13 +15,22 @@ interface ProgrammingBoardProps {
   remainingGems: ProgrammingPosition[];
 }
 
-function LightHeroModel({
+function XiaomanBoardSprite({
   direction,
   status,
 }: {
   direction: BotViewState['direction'];
   status: RunStatus;
 }) {
+  const emotion: XiaomanEmotion =
+    status === 'success'
+      ? 'cheer'
+      : status === 'blocked'
+        ? 'thinking'
+        : status === 'running'
+          ? 'happy'
+          : 'idle';
+
   return (
     <motion.div
       aria-label="小满模型"
@@ -30,23 +40,13 @@ function LightHeroModel({
         scale: status === 'success' ? 1.08 : status === 'blocked' ? 0.94 : 1,
       }}
       transition={SPRING.bounce}
-      className="relative h-full w-full"
+      className="relative flex h-full w-full items-center justify-center"
     >
-      <div className="absolute left-1/2 top-[6%] h-[78%] w-[58%] -translate-x-1/2 rounded-b-[42%] rounded-t-[48%] bg-gradient-to-b from-slate-50 via-slate-200 to-slate-400 shadow-[inset_0_-10px_18px_rgba(15,23,42,0.18)] ring-2 ring-white" />
-      <div className="absolute left-1/2 top-[8%] h-[34%] w-[42%] -translate-x-1/2 rounded-[45%] bg-gradient-to-b from-slate-50 to-slate-300 shadow-sm ring-2 ring-white">
-        <div className="absolute left-[18%] top-[38%] h-[16%] w-[24%] rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.85)]" />
-        <div className="absolute right-[18%] top-[38%] h-[16%] w-[24%] rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.85)]" />
-      </div>
-      <div className="absolute left-[18%] top-[42%] h-[32%] w-[18%] -rotate-12 rounded-full bg-gradient-to-b from-rose-400 to-red-500 ring-2 ring-white" />
-      <div className="absolute right-[18%] top-[42%] h-[32%] w-[18%] rotate-12 rounded-full bg-gradient-to-b from-rose-400 to-red-500 ring-2 ring-white" />
-      <div className="absolute left-1/2 top-[40%] h-[40%] w-[30%] -translate-x-1/2 rounded-b-[45%] bg-gradient-to-b from-red-500 via-rose-500 to-red-700 ring-2 ring-white" />
-      <div className="absolute left-1/2 top-[48%] h-[16%] w-[16%] -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(34,211,238,0.95)] ring-2 ring-white" />
-      <div className="absolute left-[34%] top-[78%] h-[18%] w-[13%] rounded-full bg-slate-300 ring-2 ring-white" />
-      <div className="absolute right-[34%] top-[78%] h-[18%] w-[13%] rounded-full bg-slate-300 ring-2 ring-white" />
+      <XiaomanSprite emotion={emotion} className="h-full w-full object-contain drop-shadow-md" />
       <motion.div
         animate={{ opacity: status === 'running' ? [0.35, 1, 0.35] : 0.55 }}
         transition={{ duration: 0.9, repeat: status === 'running' ? Infinity : 0 }}
-        className="absolute left-1/2 top-[-18%] h-[30%] w-[16%] -translate-x-1/2 rounded-full bg-cyan-200 blur-sm"
+        className="absolute left-1/2 top-[-12%] h-[24%] w-[16%] -translate-x-1/2 rounded-full bg-cyan-200 blur-sm"
       />
     </motion.div>
   );
@@ -107,10 +107,12 @@ function ProgrammingBoardComponent({
               <motion.div
                 layoutId="programming-bot"
                 transition={SPRING.bounce}
-                className="absolute inset-1 flex items-center justify-center rounded-[1rem] bg-gradient-to-b from-white to-sky-50 shadow-lg shadow-sky-300/40 ring-2 ring-sky-200"
+                className={`absolute inset-1 flex items-center justify-center rounded-[1rem] bg-gradient-to-b from-white to-sky-50 shadow-lg shadow-sky-300/40 ring-2 ${
+                  status === 'blocked' ? 'ring-4 ring-orange-300' : 'ring-sky-200'
+                }`}
               >
                 <div className="relative h-[82%] w-[82%]">
-                  <LightHeroModel direction={bot.direction} status={status} />
+                  <XiaomanBoardSprite direction={bot.direction} status={status} />
                   <div className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-sky-600 text-sm font-black text-white shadow-sm ring-2 ring-white">
                     {DIRECTION_ARROW[bot.direction]}
                   </div>
