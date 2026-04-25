@@ -16,6 +16,7 @@ export interface DiagnosticSnapshot {
   recommendedDifficulty: number;
   correctCount: number;
   firstTryCorrectCount: number;
+  runSeed?: number;
 }
 
 const DIAGNOSTIC_PLAN: DiagnosticQuestionPlan[] = [
@@ -24,19 +25,46 @@ const DIAGNOSTIC_PLAN: DiagnosticQuestionPlan[] = [
   { variant: 'makeTen', difficulty: 4, serial: 2 },
 ];
 
-const DIAGNOSTIC_RNG_VALUES = [0.24, 0.62, 0.38];
-
-function fixedRng(seed: number) {
-  return () => DIAGNOSTIC_RNG_VALUES[seed % DIAGNOSTIC_RNG_VALUES.length] ?? 0.42;
+function normalizeSeed(seed: number) {
+  return Math.abs(Math.round(seed)) || 1;
 }
 
-export function getDiagnosticQuestion(serial: number): Question {
-  const plan = DIAGNOSTIC_PLAN[serial % DIAGNOSTIC_PLAN.length];
+function createSeededRng(seed: number) {
+  let value = normalizeSeed(seed) >>> 0;
+
+  return () => {
+    value += 0x6d2b79f5;
+    let next = value;
+    next = Math.imul(next ^ (next >>> 15), next | 1);
+    next ^= next + Math.imul(next ^ (next >>> 7), next | 61);
+    return ((next ^ (next >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function diagnosticPlanForSeed(runSeed: number) {
+  const rng = createSeededRng(runSeed);
+  return [...DIAGNOSTIC_PLAN].sort(() => rng() - 0.5);
+}
+
+export function createDiagnosticRunSeed(now = Date.now()) {
+  if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return values[0] || normalizeSeed(now);
+  }
+
+  return normalizeSeed(now + Math.random() * 1_000_000);
+}
+
+export function getDiagnosticQuestion(serial: number, runSeed = 1): Question {
+  const safeSeed = normalizeSeed(runSeed);
+  const plan = diagnosticPlanForSeed(safeSeed)[serial % DIAGNOSTIC_PLAN.length];
+  const questionSerial = plan.serial + serial + (safeSeed % 997);
   const question = generateQuestion({
     difficulty: plan.difficulty,
-    serial: plan.serial,
+    serial: questionSerial,
     variant: plan.variant,
-    rng: fixedRng(serial),
+    rng: createSeededRng(safeSeed + serial * 101 + plan.difficulty * 17),
   });
 
   return {
@@ -68,10 +96,13 @@ export function readDiagnosticSnapshot(): DiagnosticSnapshot | null {
         10,
       ),
       correctCount: Math.max(0, Math.round(Number(parsed.correctCount ?? 0))),
-      firstTryCorrectCount: Math.max(
+    firstTryCorrectCount: Math.max(
         0,
         Math.round(Number(parsed.firstTryCorrectCount ?? 0)),
       ),
+      runSeed: Number.isFinite(Number(parsed.runSeed))
+        ? normalizeSeed(Number(parsed.runSeed))
+        : undefined,
     };
   } catch {
     return null;
@@ -84,4 +115,12 @@ export function writeDiagnosticSnapshot(snapshot: DiagnosticSnapshot) {
   }
 
   window.localStorage.setItem(DIAGNOSTIC_STORAGE_KEY, JSON.stringify(snapshot));
+}
+
+export function clearDiagnosticSnapshot() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(DIAGNOSTIC_STORAGE_KEY);
 }

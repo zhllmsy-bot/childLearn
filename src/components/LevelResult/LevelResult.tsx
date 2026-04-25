@@ -1,4 +1,4 @@
-import { Award, Flame, Home, RotateCcw, Sparkles, Star, Trophy } from 'lucide-react';
+import { Award, Flame, Gift, Home, RotateCcw, Sparkles, Star, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import type { Sticker } from '../../engagement/collection/useStickers';
@@ -7,6 +7,7 @@ import type { GardenReward } from '../../engagement/reward/useRewardGarden';
 import { SPRING } from '../../theme/springs';
 import { BigButton } from '../_primitives/BigButton';
 import { StickerArtwork } from '../_primitives/StickerArtwork';
+import { XiaomanSprite } from '../_primitives/XiaomanSprite';
 
 interface LevelResultProps {
   correct: number;
@@ -75,22 +76,19 @@ function RewardChest({
   const visibleSpirits = newSpirits.slice(0, 6);
   const hiddenSpiritCount = Math.max(newSpirits.length - visibleSpirits.length, 0);
   const chestTone = {
-    sprout: 'from-emerald-300 to-teal-500',
-    rainbow: 'from-sky-300 via-fuchsia-300 to-amber-300',
-    sun: 'from-yellow-300 to-orange-400',
+    sprout: 'from-[#C8EDBC] to-[#EAF9E6]',
+    rainbow: 'from-[#C2E0FF] to-[#F7CFEF]',
+    sun: 'from-[#FFECB0] to-[#FFD9C2]',
   }[reward.chestTier];
 
   return (
     <div
-      className={`relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br ${chestTone} p-4 text-left text-emerald-950 shadow-xl ring-2 ring-white`}
+      className={`relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br ${chestTone} p-4 text-left text-[#183024] shadow-xl ring-2 ring-white`}
     >
-      <div className="pointer-events-none absolute -right-6 -top-8 text-8xl opacity-25">
-        🎁
-      </div>
       <div className="relative grid gap-4 md:grid-cols-[1fr_1.1fr] md:items-center">
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/60 text-4xl shadow-sm ring-2 ring-white">
-            {reward.treeStage.emoji}
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/70 text-[#3EA02D] shadow-sm ring-2 ring-white">
+            <Gift size={34} strokeWidth={3.2} />
           </div>
           <div>
             <div className="text-sm font-black text-emerald-900/75">
@@ -155,23 +153,19 @@ export function LevelResult({
   return (
     <motion.section
       key="level-result"
-      initial={{ opacity: 0, scale: 0.94, y: 28 }}
+          initial={{ opacity: 0, scale: 0.96, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96, y: -18 }}
       transition={SPRING.smooth}
       className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center gap-4 pb-16 text-center"
     >
       <div className="relative w-full overflow-hidden rounded-[2rem] border border-white/75 bg-white/88 p-5 shadow-[0_28px_90px_rgba(15,118,110,0.18)] ring-1 ring-emerald-900/5 backdrop-blur-xl md:p-6">
-        <div className="pointer-events-none absolute -right-10 -top-12 text-[9rem] opacity-20">
-          🏆
-        </div>
-        <div className="pointer-events-none absolute bottom-5 left-8 text-6xl opacity-20">
-          🎉
-        </div>
-
         <div className="relative flex flex-col items-center gap-4">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 text-6xl font-black text-white shadow-2xl shadow-amber-500/35 ring-8 ring-white">
-            {rating}
+          <div className="relative flex items-center justify-center">
+            <XiaomanSprite emotion="cheer" className="h-32 w-32 drop-shadow-xl" />
+            <span className="absolute -right-2 top-2 flex h-14 w-14 items-center justify-center rounded-full bg-[#FFB200] text-3xl font-black text-white shadow-xl ring-4 ring-white">
+              {rating}
+            </span>
           </div>
           <div>
             <div className="text-base font-black text-emerald-700/80">
@@ -184,8 +178,13 @@ export function LevelResult({
 
           <div className="flex gap-2 text-3xl">
             {Array.from({ length: 3 }, (_, index) => (
-              <span key={index} className={index < earnedStars ? '' : 'grayscale opacity-25'}>
-                ⭐
+              <span
+                key={index}
+                className={
+                  index < earnedStars ? 'text-[#FFB200]' : 'text-[#183024]/20'
+                }
+              >
+                <Star size={34} fill="currentColor" strokeWidth={2.8} />
               </span>
             ))}
           </div>

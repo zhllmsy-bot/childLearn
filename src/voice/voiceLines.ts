@@ -207,7 +207,7 @@ export function buildCorrectVoiceLine({
       moment: 'reward',
       rate: REWARD_RATE,
       voice: GENTLE_VOICE,
-      text: compact(`对啦，还多了一张光之贴纸。先收好，下一题也慢慢看。`),
+      text: compact(`对啦，还多了一张伙伴贴纸。先收好，下一题也慢慢看。`),
     };
   }
 

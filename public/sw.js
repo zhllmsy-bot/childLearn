@@ -1,5 +1,16 @@
-const CACHE_NAME = 'childlearn-shell-v1';
-const SHELL_ASSETS = ['/', '/index.html', '/favicon.svg', '/manifest.webmanifest'];
+const CACHE_NAME = 'childlearn-shell-v2-20260425';
+const SHELL_ASSETS = [
+  '/',
+  '/index.html',
+  '/favicon.svg',
+  '/manifest.webmanifest',
+  '/icons/app-icon-192.png',
+  '/icons/app-icon-512.png',
+  '/characters/xiaoman/idle.svg',
+  '/characters/xiaoman/happy.svg',
+  '/characters/xiaoman/thinking.svg',
+  '/characters/xiaoman/cheer.svg',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

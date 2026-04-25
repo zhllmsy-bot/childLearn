@@ -17,7 +17,7 @@ export function useNoInterrupt(onMessage: MessageHandler, enabled = true) {
     };
     window.confirm = (message?: string) => {
       onMessage(String(message ?? ''));
-      return false;
+      return true;
     };
 
     const preventContextMenu = (event: MouseEvent) => event.preventDefault();

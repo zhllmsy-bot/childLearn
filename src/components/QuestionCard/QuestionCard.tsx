@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { Flag, Star } from 'lucide-react';
 import type { Question } from '../../curriculum/types';
 import { SPRING } from '../../theme/springs';
 import { CARD, SHADOW, TEXT_GRADIENT } from '../../theme/tokens';
@@ -20,82 +21,70 @@ const VARIANT_LABEL = {
 } as const;
 
 const CARD_SUCCESS_MOTION = {
-  scale: [1, 1.05, 0.32, 0.24],
-  x: ['0vw', '0vw', '34vw', '34vw'],
-  y: ['0vh', '0vh', '-31vh', '-31vh'],
-  rotate: [0, -2, 7, 14],
+  scale: [1, 1.06, 1],
+  x: 0,
+  y: 0,
+  rotate: [0, -1, 0],
 };
 
 const CARD_SUCCESS_TIMING = {
-  duration: 1.1,
-  times: [0, 0.18, 0.72, 1],
-  ease: 'easeInOut' as const,
+  duration: 0.32,
+  times: [0, 0.55, 1],
+  ease: [0.2, 0.8, 0.2, 1] as const,
 };
 
 const CARD_BODY_SUCCESS_MOTION = {
-  opacity: [1, 1, 1, 0],
-  scale: [1, 1, 1, 0.68],
-  filter: ['blur(0px)', 'blur(0px)', 'blur(0px)', 'blur(7px)'],
+  opacity: 1,
+  scale: [1, 1.02, 1],
+  filter: 'blur(0px)',
 };
 
-const SHATTER_PIECES = [
-  { x: -300, y: -150, rotate: -55, className: 'h-10 w-16 bg-emerald-300' },
-  { x: -220, y: 170, rotate: 44, className: 'h-9 w-14 bg-lime-300' },
-  { x: -90, y: -250, rotate: 82, className: 'h-12 w-12 bg-yellow-300' },
-  { x: 110, y: -230, rotate: -75, className: 'h-9 w-16 bg-cyan-300' },
-  { x: 230, y: 145, rotate: 58, className: 'h-10 w-14 bg-orange-300' },
-  { x: 310, y: -90, rotate: -28, className: 'h-12 w-12 bg-rose-300' },
-  { x: -20, y: 260, rotate: 124, className: 'h-9 w-16 bg-teal-300' },
-  { x: 180, y: 250, rotate: -130, className: 'h-11 w-11 bg-amber-300' },
+const OBJECT_TOKEN_CLASS = [
+  'from-[#7FC86A] to-[#3EA02D] shadow-[#3EA02D]/28',
+  'from-[#FFD257] to-[#FFB200] shadow-[#FFB200]/30',
+  'from-[#7BBBFF] to-[#2E8CF0] shadow-[#2E8CF0]/24',
+  'from-[#FFA47A] to-[#F77444] shadow-[#F77444]/22',
 ] as const;
 
-function CardShatterBurst() {
+function ObjectToken({ index }: { index: number }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-      {SHATTER_PIECES.map((piece, index) => (
-        <motion.span
-          key={`${piece.className}-${index}`}
-          initial={{ opacity: 0, x: 0, y: 0, scale: 0.35, rotate: 0 }}
-          animate={{
-            opacity: [0, 1, 1, 0],
-            x: piece.x,
-            y: piece.y,
-            scale: [1.4, 4.2, 3.4, 0.2],
-            rotate: piece.rotate,
-          }}
-          transition={{
-            delay: 0.48 + index * 0.01,
-            duration: 0.48,
-            times: [0, 0.22, 0.72, 1],
-            ease: 'easeOut',
-          }}
-          className={`absolute rounded-md shadow-2xl shadow-emerald-900/20 ring-2 ring-white/90 ${piece.className}`}
-        />
+    <span
+      className={`inline-block h-11 w-11 rounded-full bg-gradient-to-br shadow-lg ring-2 ring-white md:h-12 md:w-12 ${
+        OBJECT_TOKEN_CLASS[index % OBJECT_TOKEN_CLASS.length]
+      }`}
+      aria-hidden="true"
+    />
+  );
+}
+
+function ObjectTokenGroup({ count }: { count: number }) {
+  return (
+    <div className="flex flex-wrap justify-center gap-2">
+      {Array.from({ length: count }, (_, index) => (
+        <ObjectToken key={index} index={index} />
       ))}
     </div>
   );
 }
 
 function ConcreteView({ question }: { question: Question }) {
-  const emoji = question.theme?.emoji ?? question.objects[0] ?? '🍊';
-
   if (question.comparePair) {
     return (
-      <div className="grid gap-4 text-4xl font-black md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-3xl bg-emerald-50/80 p-4 ring-2 ring-white">
-          {Array.from({ length: question.comparePair.left }, () => emoji).join('')}
+          <ObjectTokenGroup count={question.comparePair.left} />
         </div>
         <div className="rounded-3xl bg-amber-50/80 p-4 ring-2 ring-white">
-          {Array.from({ length: question.comparePair.right }, () => emoji).join('')}
+          <ObjectTokenGroup count={question.comparePair.right} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex max-w-xl flex-wrap justify-center gap-2 text-5xl leading-tight md:text-6xl">
+    <div className="flex max-w-xl flex-wrap justify-center gap-2">
       {question.objects.map((item, index) => (
-        <span key={`${item}-${index}`}>{item}</span>
+        <ObjectToken key={`${item}-${index}`} index={index} />
       ))}
     </div>
   );
@@ -105,11 +94,9 @@ function CountingBasketView({ question }: { question: Question }) {
   return (
     <div className="relative w-full max-w-xl pt-8">
       <div className="absolute left-1/2 top-0 h-20 w-56 -translate-x-1/2 rounded-t-full border-8 border-amber-300 border-b-0 bg-transparent" />
-      <div className="relative mx-auto flex min-h-32 w-full max-w-md flex-wrap items-center justify-center gap-2 rounded-b-3xl rounded-t-xl bg-gradient-to-b from-amber-200 to-orange-300 p-5 text-5xl shadow-xl shadow-amber-500/30 ring-4 ring-white md:text-6xl">
+      <div className="relative mx-auto flex min-h-32 w-full max-w-md flex-wrap items-center justify-center gap-2 rounded-b-3xl rounded-t-xl bg-gradient-to-b from-amber-100 to-orange-200 p-5 shadow-xl shadow-amber-500/20 ring-4 ring-white">
         {question.objects.map((item, index) => (
-          <span key={`${item}-${index}`} className="drop-shadow-sm">
-            {item}
-          </span>
+          <ObjectToken key={`${item}-${index}`} index={index} />
         ))}
       </div>
     </div>
@@ -165,7 +152,7 @@ const SEGMENT_CLASS: Record<SegmentTone, string> = {
 function TickRow({ max }: { max: number }) {
   return (
     <div
-      className="mt-1 grid gap-1 px-1 text-center text-[0.62rem] font-black leading-none text-emerald-950/55"
+      className="mt-1 grid gap-1 px-1 text-center text-base font-bold leading-none text-emerald-950/65"
       style={{ gridTemplateColumns: `repeat(${max}, minmax(0, 1fr))` }}
       aria-hidden="true"
     >
@@ -185,7 +172,7 @@ function SegmentedCells({ tones, max }: { tones: SegmentTone[]; max: number }) {
       {Array.from({ length: max }, (_, index) => (
         <span
           key={index}
-          className={`flex h-10 items-center justify-center rounded-lg text-xs font-black text-emerald-950/65 shadow-sm md:h-14 md:text-sm ${SEGMENT_CLASS[tones[index] ?? 'ghost']}`}
+          className={`flex h-10 items-center justify-center rounded-lg text-base font-bold text-emerald-950/65 shadow-sm md:h-14 ${SEGMENT_CLASS[tones[index] ?? 'ghost']}`}
         >
           {index + 1}
         </span>
@@ -220,7 +207,7 @@ function SegmentedBar({
 
   return (
     <div className="rounded-2xl bg-white/55 p-2 ring-1 ring-white/80">
-      <div className="mb-1 flex items-center justify-between gap-3 text-sm font-black text-emerald-900/75">
+      <div className="mb-1 flex items-center justify-between gap-3 text-base font-bold text-emerald-900/75">
         <span>{label}</span>
         <span className="rounded-full bg-white px-2 py-0.5 text-base text-emerald-950 shadow-sm ring-1 ring-emerald-900/10">
           {unknown ? '?' : safeCount}
@@ -257,7 +244,7 @@ function TotalBar({
 
   return (
     <div className="rounded-2xl bg-white/65 p-2 ring-2 ring-emerald-100">
-      <div className="mb-1 flex items-center justify-between gap-3 text-sm font-black text-emerald-900/75">
+      <div className="mb-1 flex items-center justify-between gap-3 text-base font-bold text-emerald-900/75">
         <span>一共</span>
         <span className="rounded-full bg-white px-2 py-0.5 text-base text-emerald-950 shadow-sm ring-1 ring-emerald-900/10">
           {first + second}
@@ -335,12 +322,14 @@ function NumberLineView({ question }: { question: Question }) {
       <div className="flex items-center justify-between">
         {steps.map((step) => (
           <div key={step} className="flex flex-col items-center gap-2">
-            <span className="text-2xl">
-              {step === question.numberLine!.start
-                ? '🚩'
-                : step === question.numberLine!.end
-                  ? '⭐'
-                  : '•'}
+            <span className="flex h-8 w-8 items-center justify-center text-[#3EA02D]" aria-hidden="true">
+              {step === question.numberLine!.start ? (
+                <Flag size={26} strokeWidth={3} fill="currentColor" />
+              ) : step === question.numberLine!.end ? (
+                <Star size={26} strokeWidth={3} fill="currentColor" />
+              ) : (
+                <span className="h-2.5 w-2.5 rounded-full bg-current" />
+              )}
             </span>
             <span className="text-base font-black text-emerald-900">{step}</span>
           </div>
@@ -395,7 +384,6 @@ function QuestionCardComponent({ question, answered }: QuestionCardProps) {
       transition={shouldCelebrate ? CARD_SUCCESS_TIMING : SPRING.enter}
       className="ipad-question-card relative mx-auto w-full max-w-4xl"
     >
-      {shouldCelebrate ? <CardShatterBurst /> : null}
       <motion.div
         animate={shouldCelebrate ? CARD_BODY_SUCCESS_MOTION : { opacity: 1, scale: 1 }}
         transition={shouldCelebrate ? CARD_SUCCESS_TIMING : SPRING.enter}
@@ -413,7 +401,7 @@ function QuestionCardComponent({ question, answered }: QuestionCardProps) {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={SPRING.bounce}
-          className={`break-words text-6xl font-black leading-none tracking-normal md:text-8xl ${TEXT_GRADIENT}`}
+          className={`break-words text-5xl font-extrabold leading-tight tracking-normal md:text-6xl ${TEXT_GRADIENT}`}
         >
           {question.expression}
         </motion.h1>

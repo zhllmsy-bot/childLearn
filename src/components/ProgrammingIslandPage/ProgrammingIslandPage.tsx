@@ -25,6 +25,9 @@ import {
   type ProgrammingLevel,
   type ProgrammingPosition,
 } from '../../programming/programmingLevels';
+import { buildExecutionFrames } from '../../programming/engine/interpreter';
+import type { Block, ExecutionStep } from '../../programming/engine/types';
+import { evaluateStars } from '../../programming/engine/starEvaluator';
 import { SPRING } from '../../theme/springs';
 import { BigButton } from '../_primitives/BigButton';
 
@@ -33,23 +36,43 @@ type RunStatus = 'idle' | 'running' | 'success' | 'blocked';
 interface ProgrammingIslandPageProps {
   onBack: () => void;
   onSpeak: (text: string) => void;
-  onCompleteLevel: (level: ProgrammingLevel) => void;
+  onCompleteLevel: (
+    level: ProgrammingLevel,
+    result: ProgrammingCompletionResult,
+  ) => void;
   completedLevelIds: string[];
   unlockedLevelCount: number;
   initialLevelId: string | null;
 }
+
+export interface ProgrammingCompletionResult {
+  usedSteps: number;
+  stars: 1 | 2 | 3;
+  optimalSteps: number | null;
+  requiredCommandSatisfied: boolean;
+  blockedReason?: 'wall' | 'obstacle';
+}
+
+type ExecutionFrame = ExecutionStep;
 
 interface BotState {
   position: ProgrammingPosition;
   direction: ProgrammingDirection;
 }
 
-interface ExecutionFrame extends BotState {
-  message: string;
-  status: RunStatus;
+interface RunSummary {
+  usedSteps: number;
+  stars: 1 | 2 | 3;
 }
 
 const BOARD_SIZE = 5;
+const BASE_STEP_DELAY_MS = 620;
+type PlaybackSpeed = 0.5 | 1 | 2;
+const SPEED_OPTIONS: Array<{ label: string; value: PlaybackSpeed }> = [
+  { label: '0.5×', value: 0.5 },
+  { label: '1×', value: 1 },
+  { label: '2×', value: 2 },
+];
 
 const DIRECTION_ARROW: Record<ProgrammingDirection, string> = {
   north: '↑',
@@ -108,65 +131,6 @@ function positionKey(position: ProgrammingPosition) {
   return `${position.x}:${position.y}`;
 }
 
-function turnLeft(direction: ProgrammingDirection): ProgrammingDirection {
-  if (direction === 'north') {
-    return 'west';
-  }
-  if (direction === 'west') {
-    return 'south';
-  }
-  if (direction === 'south') {
-    return 'east';
-  }
-  return 'north';
-}
-
-function turnRight(direction: ProgrammingDirection): ProgrammingDirection {
-  if (direction === 'north') {
-    return 'east';
-  }
-  if (direction === 'east') {
-    return 'south';
-  }
-  if (direction === 'south') {
-    return 'west';
-  }
-  return 'north';
-}
-
-function nextPosition(
-  position: ProgrammingPosition,
-  direction: ProgrammingDirection,
-): ProgrammingPosition {
-  if (direction === 'north') {
-    return { x: position.x, y: position.y - 1 };
-  }
-  if (direction === 'south') {
-    return { x: position.x, y: position.y + 1 };
-  }
-  if (direction === 'west') {
-    return { x: position.x - 1, y: position.y };
-  }
-  return { x: position.x + 1, y: position.y };
-}
-
-function isInsideBoard(position: ProgrammingPosition) {
-  return (
-    position.x >= 0 &&
-    position.x < BOARD_SIZE &&
-    position.y >= 0 &&
-    position.y < BOARD_SIZE
-  );
-}
-
-function isObstacle(level: ProgrammingLevel, position: ProgrammingPosition) {
-  return level.obstacles.some((obstacle) => samePosition(obstacle, position));
-}
-
-function expandCommand(command: ProgrammingCommandId): ProgrammingCommandId[] {
-  return command === 'repeatForward2' ? ['forward', 'forward'] : [command];
-}
-
 function createStartBot(level: ProgrammingLevel): BotState {
   return {
     position: level.start,
@@ -179,77 +143,61 @@ function getLevelIndexById(levelId: string | null) {
   return index >= 0 ? index : 0;
 }
 
-function createTargetFrame(
-  level: ProgrammingLevel,
-  program: ProgrammingCommandId[],
-  bot: BotState,
-): ExecutionFrame {
-  if (level.requiredCommand && !program.includes(level.requiredCommand)) {
+function commandToBlock(command: ProgrammingCommandId, index: number): Block {
+  const blockId = `cmd-${index}`;
+
+  if (command === 'repeatForward2') {
     return {
-      ...bot,
-      message:
-        level.requiredCommandMessage ??
-        '这关还要用到指定的积木。换一换程序，再运行一次。',
-      status: 'blocked',
+      id: blockId,
+      kind: 'repeat',
+      params: { n: 2 },
+      body: [
+        {
+          id: `${blockId}:body.0`,
+          kind: 'forward',
+        },
+      ],
     };
   }
 
   return {
-    ...bot,
-    message: level.successVoice,
-    status: 'success',
+    id: blockId,
+    kind: command,
   };
 }
 
-function buildExecutionFrames(
+function buildProgramBlocks(program: ProgrammingCommandId[]): Block[] {
+  return program.map((command, index) => commandToBlock(command, index));
+}
+
+function describeExecutionMessage(
+  frame: ExecutionFrame,
   level: ProgrammingLevel,
-  program: ProgrammingCommandId[],
-): ExecutionFrame[] {
-  let bot = createStartBot(level);
-  const frames: ExecutionFrame[] = [];
-
-  for (const command of program.flatMap(expandCommand)) {
-    if (command === 'turnLeft') {
-      bot = { ...bot, direction: turnLeft(bot.direction) };
-      frames.push({ ...bot, message: '小光换了一个方向。', status: 'running' });
-      continue;
-    }
-
-    if (command === 'turnRight') {
-      bot = { ...bot, direction: turnRight(bot.direction) };
-      frames.push({ ...bot, message: '小光换了一个方向。', status: 'running' });
-      continue;
-    }
-
-    const candidate = nextPosition(bot.position, bot.direction);
-    if (!isInsideBoard(candidate) || isObstacle(level, candidate)) {
-      frames.push({
-        ...bot,
-        message: level.hintVoice,
-        status: 'blocked',
-      });
-      return frames;
-    }
-
-    bot = { ...bot, position: candidate };
-    if (samePosition(bot.position, level.target)) {
-      frames.push(createTargetFrame(level, program, bot));
-      return frames;
-    }
-
-    frames.push({ ...bot, message: '小光照着程序走了一步。', status: 'running' });
+  hasRequiredCommand: boolean,
+): string {
+  if (frame.status === 'blocked') {
+    return level.hintVoice;
   }
 
-  frames.push(
-    samePosition(bot.position, level.target)
-      ? createTargetFrame(level, program, bot)
-      : {
-          ...bot,
-          message: level.hintVoice,
-          status: 'blocked',
-        },
-  );
-  return frames;
+  if (frame.status === 'success') {
+    return hasRequiredCommand ? level.successVoice : level.requiredCommandMessage ?? level.successVoice;
+  }
+
+  if (frame.command === 'turnLeft' || frame.command === 'turnRight') {
+    return '小满换了一个方向。';
+  }
+
+  return '小满照着程序走了一步。';
+}
+
+function formatStarSummary(stars: 1 | 2 | 3) {
+  const filled = '★★★★★'.slice(0, stars);
+  const empty = '☆☆☆'.slice(stars);
+  return `${filled}${empty}`;
+}
+
+function computeStepDelay(speed: PlaybackSpeed) {
+  return Math.round(BASE_STEP_DELAY_MS / speed);
 }
 
 function wait(ms: number) {
@@ -265,7 +213,7 @@ function LightHeroModel({
 }) {
   return (
     <motion.div
-      aria-label="小光模型"
+      aria-label="小满模型"
       initial={false}
       animate={{
         rotate: DIRECTION_ROTATE[direction],
@@ -330,11 +278,13 @@ function ProgramStep({
   index,
   disabled,
   onRemove,
+  active,
 }: {
   command: ProgrammingCommandId;
   index: number;
   disabled: boolean;
   onRemove: (index: number) => void;
+  active: boolean;
 }) {
   const meta = COMMAND_META[command];
   const Icon = meta.icon;
@@ -347,7 +297,9 @@ function ProgramStep({
       disabled={disabled}
       onClick={() => onRemove(index)}
       aria-label={`删除第 ${index + 1} 步 ${meta.shortLabel}`}
-      className={`inline-flex h-14 shrink-0 items-center gap-2 rounded-2xl px-4 text-base font-black shadow-sm ring-1 ${meta.tone}`}
+      className={`inline-flex h-14 shrink-0 items-center gap-2 rounded-2xl px-4 text-base font-black shadow-sm ring-1 ${
+        active ? 'ring-4 ring-amber-400 scale-105' : ''
+      } ${meta.tone}`}
     >
       <span className="rounded-full bg-white/75 px-2 py-0.5 text-sm">{index + 1}</span>
       <Icon size={20} strokeWidth={3.2} />
@@ -374,6 +326,9 @@ export function ProgrammingIslandPage({
   );
   const [status, setStatus] = useState<RunStatus>('idle');
   const [message, setMessage] = useState(level.prompt);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
   const runIdRef = useRef(0);
 
   const isRunning = status === 'running';
@@ -396,6 +351,42 @@ export function ProgrammingIslandPage({
   );
   const progressLabel = `${levelIndex + 1}/${totalLevels}`;
   const isCurrentLevelCompleted = completedSet.has(level.id);
+  const programBlocks = useMemo(() => buildProgramBlocks(program), [program]);
+  const hasRequiredCommand =
+    !level.requiredCommand || program.includes(level.requiredCommand);
+  const world = useMemo(
+    () => ({
+      width: BOARD_SIZE,
+      height: BOARD_SIZE,
+      start: level.start,
+      direction: level.direction,
+      target: level.target,
+      obstacles: level.obstacles,
+    }),
+    [level],
+  );
+  const activeProgramStepIndex = useMemo(() => {
+    if (!activeBlockId) {
+      return null;
+    }
+
+    const match = programBlocks.findIndex(
+      (block) =>
+        block.id === activeBlockId || activeBlockId.startsWith(`${block.id}:`),
+    );
+    return match >= 0 ? match : null;
+  }, [activeBlockId, programBlocks]);
+  const currentStarThresholds = level.starThresholds ?? null;
+  const evaluateRunStars = useCallback(
+    (steps: number): 1 | 2 | 3 => {
+      if (!currentStarThresholds || !Number.isFinite(steps) || steps < 0) {
+        return 1;
+      }
+
+      return evaluateStars(Math.round(steps), currentStarThresholds);
+    },
+    [currentStarThresholds],
+  );
 
   const resetLevelState = useCallback(
     (nextLevel: ProgrammingLevel) => {
@@ -404,6 +395,8 @@ export function ProgrammingIslandPage({
       setBot(createStartBot(nextLevel));
       setVisitedKeys(new Set([positionKey(nextLevel.start)]));
       setStatus('idle');
+      setActiveBlockId(null);
+      setRunSummary(null);
       setMessage(nextLevel.prompt);
     },
     [],
@@ -431,6 +424,7 @@ export function ProgrammingIslandPage({
 
       setProgram((current) => [...current, command]);
       setStatus('idle');
+      setActiveBlockId(null);
       setMessage('很好，把下一块也放进程序里。');
     },
     [canAddCommand],
@@ -443,6 +437,7 @@ export function ProgrammingIslandPage({
 
     setProgram((current) => current.filter((_, itemIndex) => itemIndex !== index));
     setStatus('idle');
+    setActiveBlockId(null);
     setMessage('程序改好了，可以再运行一次。');
   }, [isRunning]);
 
@@ -455,6 +450,8 @@ export function ProgrammingIslandPage({
     setBot(createStartBot(level));
     setVisitedKeys(new Set([positionKey(level.start)]));
     setStatus('idle');
+    setActiveBlockId(null);
+    setRunSummary(null);
     setMessage(level.prompt);
   }, [isRunning, level]);
 
@@ -464,45 +461,83 @@ export function ProgrammingIslandPage({
     }
 
     if (program.length === 0) {
-      setMessage('先放一块指令，再让小光运行。');
-      onSpeak('先放一块指令，再让小光运行。');
+      setMessage('先放一块指令，再让小满运行。');
+      onSpeak('先放一块指令，再让小满运行。');
       return;
     }
 
     const runId = runIdRef.current + 1;
     runIdRef.current = runId;
     setStatus('running');
+    setActiveBlockId(null);
+    setRunSummary(null);
     setBot(createStartBot(level));
     setVisitedKeys(new Set([positionKey(level.start)]));
-    setMessage('小光开始照着程序走。');
+    setMessage('小满开始照着程序走。');
 
-    const frames = buildExecutionFrames(level, program);
+    const frames = buildExecutionFrames(programBlocks, world);
+    const finalFrame = frames[frames.length - 1];
+    const usedSteps = frames.length;
+    const finalStars = finalFrame?.status === 'success' && hasRequiredCommand
+      ? evaluateRunStars(usedSteps)
+      : 1;
+
     for (const frame of frames) {
-      await wait(620);
+      await wait(computeStepDelay(playbackSpeed));
       if (runIdRef.current !== runId) {
         return;
       }
 
-      setBot({ position: frame.position, direction: frame.direction });
+      setBot({ position: frame.bot.position, direction: frame.bot.direction });
+      setActiveBlockId(frame.activeBlockId);
       setVisitedKeys((current) => {
         const next = new Set(current);
-        next.add(positionKey(frame.position));
+        next.add(positionKey(frame.bot.position));
         return next;
       });
-      setMessage(frame.message);
+      setMessage(describeExecutionMessage(frame, level, hasRequiredCommand));
       setStatus(frame.status);
     }
 
-    const finalFrame = frames[frames.length - 1];
-    if (finalFrame?.status === 'success') {
+    const finalStatus =
+      finalFrame?.status === 'success' && hasRequiredCommand ? 'success' : 'blocked';
+    const finalMessage =
+      finalStatus === 'success'
+        ? level.successVoice
+        : hasRequiredCommand
+          ? level.hintVoice
+          : level.requiredCommandMessage ?? level.successVoice;
+
+    setStatus(finalStatus);
+    setActiveBlockId(finalFrame?.activeBlockId ?? null);
+    setMessage(finalMessage);
+
+    if (finalStatus === 'success') {
+      setRunSummary({ usedSteps, stars: finalStars });
       onSpeak(level.successVoice);
-      if (!completedSet.has(level.id)) {
-        onCompleteLevel(level);
-      }
-    } else {
-      onSpeak(finalFrame?.message ?? level.hintVoice);
+      onCompleteLevel(level, {
+        usedSteps,
+        stars: finalStars,
+        optimalSteps: level.optimalSteps ?? null,
+        requiredCommandSatisfied: hasRequiredCommand,
+        blockedReason: finalFrame?.blockedReason,
+      });
+      return;
     }
-  }, [completedSet, isRunning, level, onCompleteLevel, onSpeak, program]);
+
+    setRunSummary(null);
+    onSpeak(finalMessage);
+  }, [
+    hasRequiredCommand,
+    evaluateRunStars,
+    isRunning,
+    level,
+    onCompleteLevel,
+    onSpeak,
+    playbackSpeed,
+    programBlocks,
+    world,
+  ]);
 
   const goToLevel = useCallback(
     (nextIndex: number) => {
@@ -541,13 +576,6 @@ export function ProgrammingIslandPage({
       className="relative z-10 mx-auto w-full max-w-7xl pb-24"
     >
       <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/88 p-5 shadow-[0_24px_80px_rgba(15,118,110,0.14)] ring-1 ring-emerald-900/5 backdrop-blur-xl md:p-6">
-        <div className="pointer-events-none absolute -right-10 -top-12 text-[8rem] font-black tracking-normal text-sky-500 opacity-10">
-          CODE
-        </div>
-        <div className="pointer-events-none absolute bottom-1 left-[46%] text-7xl text-amber-400 opacity-10">
-          ✦
-        </div>
-
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
@@ -559,7 +587,7 @@ export function ProgrammingIslandPage({
           </button>
           <div className="min-w-0 flex-1 text-center">
             <div className="text-sm font-black text-emerald-700/80">
-              光之编程馆 · {level.concept}
+              编程岛 · {level.concept}
             </div>
             <h1 className="truncate text-4xl font-black leading-tight text-emerald-950">
               {level.title}
@@ -640,18 +668,24 @@ export function ProgrammingIslandPage({
               })}
             </div>
 
-            <div
-              className={`mt-4 rounded-[1.5rem] p-4 text-xl font-black leading-snug ring-1 ${
-                status === 'success'
-                  ? 'bg-emerald-50 text-emerald-900 ring-emerald-200'
-                  : status === 'blocked'
+              <div
+                className={`mt-4 rounded-[1.5rem] p-4 text-xl font-black leading-snug ring-1 ${
+                  status === 'success'
+                    ? 'bg-emerald-50 text-emerald-900 ring-emerald-200'
+                    : status === 'blocked'
                     ? 'bg-amber-50 text-amber-900 ring-amber-200'
                     : 'bg-white/78 text-emerald-950 ring-white'
-              }`}
-            >
-              {message}
+                }`}
+              >
+                {message}
+              </div>
+              {runSummary ? (
+                <div className="mt-3 rounded-[1.5rem] bg-emerald-50 px-4 py-3 text-base font-black text-emerald-800 ring-1 ring-emerald-100">
+                  本次运行 {runSummary.usedSteps} 步，成绩：{formatStarSummary(runSummary.stars)}
+                  {level.optimalSteps ? `（最优 ${level.optimalSteps} 步）` : ''}
+                </div>
+              ) : null}
             </div>
-          </div>
 
           <div className="grid min-w-0 gap-4">
             <div className="rounded-[2rem] bg-white/88 p-5 shadow-sm ring-1 ring-emerald-900/10">
@@ -727,6 +761,7 @@ export function ProgrammingIslandPage({
                         key={`${command}-${index}`}
                         command={command}
                         index={index}
+                        active={activeProgramStepIndex === index}
                         disabled={isRunning}
                         onRemove={removeCommand}
                       />
@@ -736,6 +771,23 @@ export function ProgrammingIslandPage({
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <div className="grid grid-cols-3 gap-2">
+                  {SPEED_OPTIONS.map((option) => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => setPlaybackSpeed(option.value)}
+                      disabled={isRunning}
+                      className={`inline-flex h-12 items-center justify-center rounded-xl border px-3 text-base font-black shadow-sm transition ${
+                        playbackSpeed === option.value
+                          ? 'border-emerald-400 bg-emerald-600 text-white ring-2 ring-emerald-300'
+                          : 'border-emerald-100 bg-white text-emerald-800'
+                      } disabled:opacity-45`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
                 <BigButton
                   type="button"
                   tone="success"

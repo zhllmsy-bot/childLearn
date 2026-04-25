@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { scheduleLearningStateSync } from '../../sync/learningStateSync';
+import type { QuestionDifficultyTags } from '../flow';
 import {
   INITIAL_DDA_STATE,
   nextDdaState,
@@ -29,18 +30,37 @@ function readStoredDdaState(): DdaState {
           .filter((item) => item === 0 || item === 1)
           .slice(-10)
       : INITIAL_DDA_STATE.recentWindow;
+    const skillWindows =
+      parsed.skillWindows && typeof parsed.skillWindows === 'object'
+        ? Object.fromEntries(
+            Object.entries(parsed.skillWindows)
+              .filter(([, value]) => Array.isArray(value))
+              .map(([key, value]) => [
+                key,
+                (value as unknown[])
+                  .map((item) => Number(item))
+                  .filter((item) => item === 0 || item === 1)
+                  .slice(-6),
+              ]),
+          )
+        : INITIAL_DDA_STATE.skillWindows;
 
     return {
       difficulty: Number.isFinite(difficulty)
         ? Math.min(Math.max(Math.round(difficulty), 1), 10)
         : INITIAL_DDA_STATE.difficulty,
       consecutiveCorrect: Number.isFinite(consecutiveCorrect)
-        ? Math.min(Math.max(Math.round(consecutiveCorrect), 0), 2)
+        ? Math.min(Math.max(Math.round(consecutiveCorrect), 0), 10)
         : INITIAL_DDA_STATE.consecutiveCorrect,
       consecutiveWrong: Number.isFinite(consecutiveWrong)
-        ? Math.min(Math.max(Math.round(consecutiveWrong), 0), 1)
+        ? Math.min(Math.max(Math.round(consecutiveWrong), 0), 10)
         : INITIAL_DDA_STATE.consecutiveWrong,
       recentWindow,
+      skillWindows,
+      focusSkillKey:
+        typeof parsed.focusSkillKey === 'string'
+          ? parsed.focusSkillKey
+          : INITIAL_DDA_STATE.focusSkillKey,
     };
   } catch {
     return INITIAL_DDA_STATE;
@@ -65,6 +85,8 @@ export function useDDA() {
       consecutiveCorrect: 0,
       consecutiveWrong: 0,
       recentWindow: [],
+      skillWindows: {},
+      focusSkillKey: null,
     };
 
     writeStoredDdaState(next);
@@ -77,10 +99,10 @@ export function useDDA() {
     [applyDifficulty],
   );
 
-  const record = useCallback((outcome: DdaOutcome) => {
-    const predicted = nextDdaState(state, outcome);
+  const record = useCallback((outcome: DdaOutcome, tags?: QuestionDifficultyTags) => {
+    const predicted = nextDdaState(state, outcome, tags);
     setState((previous) => {
-      const next = nextDdaState(previous, outcome);
+      const next = nextDdaState(previous, outcome, tags);
       writeStoredDdaState(next);
       return next;
     });
@@ -98,8 +120,10 @@ export function useDDA() {
       consecutiveCorrect: state.consecutiveCorrect,
       consecutiveWrong: state.consecutiveWrong,
       recentWindow: state.recentWindow,
-      onCorrect: () => record('correct'),
-      onWrong: () => record('wrong'),
+      skillWindows: state.skillWindows,
+      focusSkillKey: state.focusSkillKey,
+      onCorrect: (tags?: QuestionDifficultyTags) => record('correct', tags),
+      onWrong: (tags?: QuestionDifficultyTags) => record('wrong', tags),
       applyDifficulty,
       applyDiagnosticResult,
       reset,
@@ -112,7 +136,9 @@ export function useDDA() {
       state.consecutiveCorrect,
       state.consecutiveWrong,
       state.difficulty,
+      state.focusSkillKey,
       state.recentWindow,
+      state.skillWindows,
     ],
   );
 }

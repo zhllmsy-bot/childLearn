@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { INITIAL_DDA_STATE, nextDdaState } from './ddaEngine';
+import { INITIAL_DDA_STATE, nextDdaState, type DdaState } from './ddaEngine';
+
+function createState(overrides: Partial<DdaState>): DdaState {
+  return {
+    ...INITIAL_DDA_STATE,
+    ...overrides,
+    skillWindows: overrides.skillWindows ?? {},
+    focusSkillKey: overrides.focusSkillKey ?? null,
+  };
+}
 
 describe('ddaEngine', () => {
   it('raises difficulty when recent accuracy is above the flow band', () => {
@@ -14,12 +23,12 @@ describe('ddaEngine', () => {
   });
 
   it('lowers difficulty when recent accuracy falls below the flow band', () => {
-    const state = {
+    const state = createState({
       difficulty: 3,
       consecutiveCorrect: 0,
       consecutiveWrong: 0,
       recentWindow: [1, 1, 1, 1],
-    };
+    });
 
     const first = nextDdaState(state, 'wrong');
     const second = nextDdaState(first, 'wrong');
@@ -31,12 +40,12 @@ describe('ddaEngine', () => {
 
   it('does not lower difficulty below one', () => {
     const next = nextDdaState(
-      {
+      createState({
         difficulty: 1,
         consecutiveCorrect: 0,
         consecutiveWrong: 0,
         recentWindow: [0, 1, 0, 1],
-      },
+      }),
       'wrong',
     );
 
@@ -60,5 +69,18 @@ describe('ddaEngine', () => {
 
     expect(next.difficulty).toBe(1);
     expect(next.recentWindow).toEqual([1, 1, 1, 1]);
+  });
+
+  it('lowers difficulty when errors are scattered inside the recent window', () => {
+    const next = nextDdaState(
+      createState({
+        difficulty: 4,
+        recentWindow: [1, 0, 1, 0],
+      }),
+      'wrong',
+    );
+
+    expect(next.difficulty).toBe(3);
+    expect(next.recentWindow).toEqual([1, 0, 1, 0, 0]);
   });
 });

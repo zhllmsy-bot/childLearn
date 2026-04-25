@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Xiaoman apple friend idle">
+  <defs>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .08"/></feComponentTransfer></filter>
+  </defs>
+  <rect width="240" height="240" rx="42" fill="#FFF9EF"/>
+  <ellipse cx="120" cy="212" rx="56" ry="13" fill="#183024" opacity=".10"/>
+  <path d="M126 49c17-25 35-25 51-13-6 23-27 33-51 13Z" fill="#7FC86A" stroke="#183024" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M119 59c6-18 6-29 0-40" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="5" stroke-linecap="round"/>
+  <path d="M61 118c0-43 26-71 59-71s59 28 59 71c0 51-27 85-59 85s-59-34-59-85Z" fill="#E24B3F" stroke="#183024" stroke-opacity=".8" stroke-width="6"/>
+  <path d="M68 130c5 32 24 58 52 58 30 0 48-28 52-59-9 34-28 48-52 48-23 0-43-14-52-47Z" fill="#B44918" opacity=".16"/>
+  <circle cx="96" cy="119" r="16" fill="#FFF9EF" stroke="#183024" stroke-opacity=".8" stroke-width="5"/>
+  <circle cx="144" cy="119" r="16" fill="#FFF9EF" stroke="#183024" stroke-opacity=".8" stroke-width="5"/>
+  <circle cx="101" cy="120" r="6" fill="#183024"/>
+  <circle cx="139" cy="120" r="6" fill="#183024"/>
+  <circle cx="82" cy="145" r="12" fill="#FFD9C2" opacity=".9"/>
+  <circle cx="158" cy="145" r="12" fill="#FFD9C2" opacity=".9"/>
+  <path d="M106 151c8 8 20 8 28 0" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="5" stroke-linecap="round"/>
+  <path d="M72 157c-18 5-28-4-29-17" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M168 157c18 5 28-4 29-17" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M95 200c-5 12-12 18-21 20" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M145 200c5 12 12 18 21 20" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <rect width="240" height="240" rx="42" filter="url(#grain)" opacity=".8"/>
+</svg>

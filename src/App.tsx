@@ -1,34 +1,28 @@
 import {
   Suspense,
-  lazy,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Award, Gem, Sparkles, Star } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { ComboBanner } from './components/ComboBanner/ComboBanner';
 import {
   FeedbackBadge,
   type FeedbackLevel,
 } from './components/FeedbackBadge/FeedbackBadge';
-import { FloatingDecoration } from './components/FloatingDecoration/FloatingDecoration';
 import { HomeDashboard } from './components/HomeDashboard/HomeDashboard';
 import { LevelResult } from './components/LevelResult/LevelResult';
-import {
-  OptionButton,
-  type OptionVisualState,
-} from './components/OptionButton/OptionButton';
 import { ParentReportPanel } from './components/ParentReportPanel/ParentReportPanel';
-import { QuestionCard } from './components/QuestionCard/QuestionCard';
-import { Stat } from './components/Stat/Stat';
+import { PracticeSession } from './components/PracticeSession/PracticeSession';
 import { StickerActionModal } from './components/StickerActionModal/StickerActionModal';
 import { TopBar } from './components/TopBar/TopBar';
 import { generateQuestion } from './curriculum/questionFactory';
 import {
   DIAGNOSTIC_QUESTION_COUNT,
+  clearDiagnosticSnapshot,
+  createDiagnosticRunSeed,
   getDiagnosticQuestion,
   readDiagnosticSnapshot,
   writeDiagnosticSnapshot,
@@ -38,12 +32,10 @@ import type { Question, QuestionOption } from './curriculum/types';
 import {
   getLevelPackById,
   getLevelPackForDifficulty,
-  isLevelPackId,
   selectLevelPackItem,
   selectLevelPackQuestionPlan,
   type LevelPackId,
 } from './curriculum/levelPacks';
-import { HintLadder } from './curriculum/scaffolding/HintLadder';
 import { useAbilityProfile } from './engagement/ability/useAbilityProfile';
 import { useCombo } from './engagement/combo/useCombo';
 import { useDailyFirstWin } from './engagement/daily/useDailyFirstWin';
@@ -84,6 +76,7 @@ import type {
   StickerSeriesProgress,
 } from './engagement/collection/useStickers';
 import type { ProgrammingLevel } from './programming/programmingLevels';
+import type { ProgrammingCompletionResult } from './components/ProgrammingIslandPage/ProgrammingIslandPage';
 import { useProgrammingProgress } from './programming/useProgrammingProgress';
 import {
   DEFAULT_ENGLISH_ITEM,
@@ -101,15 +94,11 @@ import { LongPressGate } from './immersion/LongPressGate';
 import { SkeletonScreen } from './immersion/SkeletonScreen';
 import { ToastStack, type ToastMessage } from './immersion/Toast';
 import { useNoInterrupt } from './immersion/useNoInterrupt';
-import { celebrate, type CelebrationLevel } from './theme/confetti';
+import { celebrate } from './theme/confetti';
 import { playPositiveFeedback, playTryAgainFeedback } from './theme/sound';
 import { BG } from './theme/tokens';
 import { track } from './telemetry/track';
-import { resolveRuntimeUrl } from './network/runtimeUrl';
-import {
-  scheduleLearningStateSync,
-  useLearningStateSync,
-} from './sync/learningStateSync';
+import { useLearningStateSync } from './sync/learningStateSync';
 import {
   buildCorrectVoiceLine,
   buildEnglishVoiceLine,
@@ -123,459 +112,48 @@ import {
   estimateVoiceLineDurationMs,
 } from './voice/voiceLines';
 import { useVoicePlayer } from './voice/useVoicePlayer';
-
-const EnglishModulePage = lazy(() =>
-  import('./components/EnglishModulePage/EnglishModulePage').then((module) => ({
-    default: module.EnglishModulePage,
-  })),
-);
-const LiteracyModulePage = lazy(() =>
-  import('./components/LiteracyModulePage/LiteracyModulePage').then((module) => ({
-    default: module.LiteracyModulePage,
-  })),
-);
-const ProgrammingIslandPage = lazy(() =>
-  import('./components/ProgrammingIslandPage/ProgrammingIslandPage').then((module) => ({
-    default: module.ProgrammingIslandPage,
-  })),
-);
-const StickerAlbumPage = lazy(() =>
-  import('./components/StickerAlbumPage/StickerAlbumPage').then((module) => ({
-    default: module.StickerAlbumPage,
-  })),
-);
-
-type AppScene =
-  | 'home'
-  | 'practice'
-  | 'result'
-  | 'stickers'
-  | 'literacy'
-  | 'english'
-  | 'programming';
-
-type PracticeRunMode = 'level' | 'diagnostic';
-
-interface SessionStats {
-  attempted: number;
-  correct: number;
-  hintsUsed: number;
-}
-
-interface LevelResultSnapshot {
-  correct: number;
-  total: number;
-  mistakes: number;
-  maxCombo: number;
-  starsEarned: number;
-  rankName: string;
-  difficulty: number;
-  sticker: Sticker | null;
-  gardenReward: GardenReward;
-  newSpirits: NumberSpirit[];
-}
-
-interface ActiveQuestionTelemetry {
-  questionId: string;
-  questionIndex: number;
-  startedAtMs: number;
-  lastInteractionAtMs: number;
-  firstSelectedAnswer: number | null;
-  firstResponseTimeMs: number | null;
-  attemptCount: number;
-  audioReplayCount: number;
-  hintCount: number;
-  idleMs: number;
-  idleNotified: boolean;
-  rapidClickCount: number;
-  feedbackInterruptClickCount: number;
-  abandoned: boolean;
-}
-
-const INITIAL_STATS: SessionStats = {
-  attempted: 0,
-  correct: 0,
-  hintsUsed: 0,
-};
-
-const STATS_STORAGE_KEY = 'childlearn.session-stats';
-const DEFAULT_LEVEL_QUESTION_GOAL = 10;
-const CORRECT_ADVANCE_MIN_MS = 2100;
-const WRONG_FEEDBACK_MIN_MS = 1500;
-const WRONG_FINAL_ADVANCE_MIN_MS = 2600;
-const MAX_WRONG_ATTEMPTS_PER_QUESTION = 3;
-const INTRO_TO_QUESTION_GAP_MS = 240;
-const QUESTION_ENTRY_DELAY_MS = 520;
-const QUESTION_IDLE_THRESHOLD_MS = 12000;
-const RAPID_CLICK_THRESHOLD_MS = 450;
-const FLOW_OBSERVER_URL = resolveRuntimeUrl(import.meta.env.VITE_FLOW_OBSERVER_URL?.trim());
-const configuredFlowObserverTimeoutMs = Number(
-  import.meta.env.VITE_FLOW_OBSERVER_TIMEOUT_MS,
-);
-const FLOW_OBSERVER_TIMEOUT_MS =
-  Number.isFinite(configuredFlowObserverTimeoutMs) &&
-  configuredFlowObserverTimeoutMs > 0
-    ? configuredFlowObserverTimeoutMs
-    : 4500;
-const APP_STATE_STORAGE_KEY = 'childlearn.app-state-v1';
-const APP_SCROLL_STORAGE_KEY = 'childlearn.app-scroll-v1';
-const INTERIM_FLOW_EVALUATION_INTERVAL = 5;
-
-type FlowObserverStatus = 'unconfigured' | 'idle' | 'pending' | 'ready' | 'failed';
-type FlowEvaluationTrigger = 'interim' | 'level_complete';
-
-interface StoredAppSnapshot {
-  schemaVersion: 1;
-  updatedAt: number;
-  scene: AppScene;
-  questionIndex: number;
-  question: Question;
-  selectedOptionId: string | null;
-  feedback: FeedbackLevel | null;
-  answered: boolean;
-  hintStage: number;
-  levelQuestionGoal: number;
-  levelProgress: number;
-  levelMistakes: number;
-  levelBestCombo: number;
-  levelStarsEarned: number;
-  levelLatestStickerId: string | null;
-  levelNewSpirits: NumberSpirit[];
-  activeLevelPackId: LevelPackId | null;
-  lastResult: LevelResultSnapshot | null;
-  flowShadowReport: LearningBatchReport | null;
-  flowShadowPolicy: ApprovedFlowPolicy | null;
-  flowObservation: LlmLearningObservation | null;
-  flowObserverStatus: FlowObserverStatus;
-  reviewQueue: ReviewItem[];
-  selectedStickerId: string | null;
-  selectedLiteracyId: string | null;
-  selectedEnglishId: string | null;
-  practiceRunId: string | null;
-  activeQuestionTelemetry: ActiveQuestionTelemetry | null;
-  levelAttemptRecords: QuestionAttemptRecord[];
-  recentFlowStates: FlowState[];
-  currentRunPolicy: ApprovedFlowPolicy | null;
-  currentRunPolicyBatchId: string | null;
-  currentRunMode?: PracticeRunMode;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object';
-}
-
-function isAppScene(value: unknown): value is AppScene {
-  return (
-    value === 'home' ||
-    value === 'practice' ||
-    value === 'result' ||
-    value === 'stickers' ||
-    value === 'literacy' ||
-    value === 'english' ||
-    value === 'programming'
-  );
-}
-
-function isQuestion(value: unknown): value is Question {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    typeof value.id === 'string' &&
-    typeof value.factId === 'string' &&
-    typeof value.prompt === 'string' &&
-    typeof value.expression === 'string' &&
-    typeof value.answer === 'number' &&
-    Array.isArray(value.options)
-  );
-}
-
-function readStoredScrollSnapshot(): Partial<Record<AppScene, number>> {
-  if (typeof window === 'undefined') {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(APP_SCROLL_STORAGE_KEY) ?? '{}',
-    ) as Record<string, unknown>;
-
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .filter(([sceneKey, scrollTop]) => isAppScene(sceneKey) && typeof scrollTop === 'number')
-        .map(([sceneKey, scrollTop]) => [
-          sceneKey,
-          Math.max(0, Math.round(Number(scrollTop))),
-        ]),
-    ) as Partial<Record<AppScene, number>>;
-  } catch {
-    return {};
-  }
-}
-
-function writeStoredScrollSnapshot(snapshot: Partial<Record<AppScene, number>>) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(APP_SCROLL_STORAGE_KEY, JSON.stringify(snapshot));
-}
-
-function readStoredAppSnapshot(): StoredAppSnapshot | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(APP_STATE_STORAGE_KEY) ?? 'null',
-    ) as Partial<StoredAppSnapshot> | null;
-
-    if (!parsed || parsed.schemaVersion !== 1 || !isAppScene(parsed.scene)) {
-      return null;
-    }
-
-    if (!isQuestion(parsed.question)) {
-      return null;
-    }
-
-    const scene =
-      parsed.scene === 'result' && !parsed.lastResult ? 'home' : parsed.scene;
-
-    return {
-      schemaVersion: 1,
-      updatedAt: Number(parsed.updatedAt ?? Date.now()),
-      scene,
-      questionIndex: Number.isFinite(Number(parsed.questionIndex))
-        ? Math.max(0, Math.round(Number(parsed.questionIndex)))
-        : 0,
-      question: parsed.question,
-      selectedOptionId:
-        typeof parsed.selectedOptionId === 'string' ? parsed.selectedOptionId : null,
-      feedback: parsed.feedback ?? null,
-      answered: Boolean(parsed.answered),
-      hintStage: Number.isFinite(Number(parsed.hintStage))
-        ? Math.min(Math.max(Math.round(Number(parsed.hintStage)), 0), 3)
-        : 0,
-      levelQuestionGoal: Number.isFinite(Number(parsed.levelQuestionGoal))
-        ? Math.max(1, Math.round(Number(parsed.levelQuestionGoal)))
-        : DEFAULT_LEVEL_QUESTION_GOAL,
-      levelProgress: Number.isFinite(Number(parsed.levelProgress))
-        ? Math.max(0, Math.round(Number(parsed.levelProgress)))
-        : 0,
-      levelMistakes: Number.isFinite(Number(parsed.levelMistakes))
-        ? Math.max(0, Math.round(Number(parsed.levelMistakes)))
-        : 0,
-      levelBestCombo: Number.isFinite(Number(parsed.levelBestCombo))
-        ? Math.max(0, Math.round(Number(parsed.levelBestCombo)))
-        : 0,
-      levelStarsEarned: Number.isFinite(Number(parsed.levelStarsEarned))
-        ? Math.max(0, Math.round(Number(parsed.levelStarsEarned)))
-        : 0,
-      levelLatestStickerId:
-        typeof parsed.levelLatestStickerId === 'string'
-          ? parsed.levelLatestStickerId
-          : null,
-      levelNewSpirits: Array.isArray(parsed.levelNewSpirits)
-        ? parsed.levelNewSpirits
-        : [],
-      activeLevelPackId: isLevelPackId(parsed.activeLevelPackId)
-        ? parsed.activeLevelPackId
-        : null,
-      lastResult: parsed.lastResult ?? null,
-      flowShadowReport: parsed.flowShadowReport ?? null,
-      flowShadowPolicy: parsed.flowShadowPolicy ?? null,
-      flowObservation: parsed.flowObservation ?? null,
-      flowObserverStatus:
-        parsed.flowObserverStatus === 'ready' || parsed.flowObserverStatus === 'failed'
-          ? parsed.flowObserverStatus
-          : FLOW_OBSERVER_URL
-            ? 'idle'
-            : 'unconfigured',
-      reviewQueue: Array.isArray(parsed.reviewQueue) ? parsed.reviewQueue : [],
-      selectedStickerId:
-        typeof parsed.selectedStickerId === 'string' ? parsed.selectedStickerId : null,
-      selectedLiteracyId:
-        typeof parsed.selectedLiteracyId === 'string'
-          ? parsed.selectedLiteracyId
-          : DEFAULT_LITERACY_ITEM.id,
-      selectedEnglishId:
-        typeof parsed.selectedEnglishId === 'string'
-          ? parsed.selectedEnglishId
-          : DEFAULT_ENGLISH_ITEM.id,
-      practiceRunId:
-        typeof parsed.practiceRunId === 'string' ? parsed.practiceRunId : null,
-      activeQuestionTelemetry: parsed.activeQuestionTelemetry ?? null,
-      levelAttemptRecords: Array.isArray(parsed.levelAttemptRecords)
-        ? parsed.levelAttemptRecords
-        : [],
-      recentFlowStates: Array.isArray(parsed.recentFlowStates)
-        ? parsed.recentFlowStates
-        : [],
-      currentRunPolicy: parsed.currentRunPolicy ?? null,
-      currentRunPolicyBatchId:
-        typeof parsed.currentRunPolicyBatchId === 'string'
-          ? parsed.currentRunPolicyBatchId
-          : null,
-      currentRunMode:
-        parsed.currentRunMode === 'diagnostic' || parsed.currentRunMode === 'level'
-          ? parsed.currentRunMode
-          : 'level',
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredAppSnapshot(snapshot: StoredAppSnapshot) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(snapshot));
-  scheduleLearningStateSync('app_state');
-}
-
-function hydrateSticker(sticker: Sticker | null) {
-  return sticker ? findStickerById(sticker.id) ?? sticker : null;
-}
-
-function hydrateLevelResult(snapshot: StoredAppSnapshot | null) {
-  if (!snapshot?.lastResult) {
-    return null;
-  }
-
-  return {
-    ...snapshot.lastResult,
-    sticker: hydrateSticker(snapshot.lastResult.sticker),
-  };
-}
-
-function readStoredStats(): SessionStats {
-  if (typeof window === 'undefined') {
-    return INITIAL_STATS;
-  }
-
-  try {
-    const parsed = JSON.parse(
-      window.localStorage.getItem(STATS_STORAGE_KEY) ?? '{}',
-    ) as Partial<SessionStats>;
-
-    const attempted = Number(parsed.attempted ?? 0);
-    const correct = Number(parsed.correct ?? 0);
-    const hintsUsed = Number(parsed.hintsUsed ?? 0);
-
-    return {
-      attempted: Number.isFinite(attempted) ? Math.max(0, attempted) : 0,
-      correct: Number.isFinite(correct) ? Math.max(0, correct) : 0,
-      hintsUsed: Number.isFinite(hintsUsed) ? Math.max(0, hintsUsed) : 0,
-    };
-  } catch {
-    return INITIAL_STATS;
-  }
-}
-
-function writeStoredStats(stats: SessionStats) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats));
-  scheduleLearningStateSync('session_stats');
-}
-
-function feedbackForCombo(combo: number): CelebrationLevel {
-  if (combo >= 10) {
-    return 'amazing';
-  }
-
-  if (combo >= 3) {
-    return 'great';
-  }
-
-  return 'correct';
-}
-
-function getOptionState({
-  option,
-  question,
-  selectedOptionId,
-  answered,
-  hintStage,
-}: {
-  option: QuestionOption;
-  question: Question;
-  selectedOptionId: string | null;
-  answered: boolean;
-  hintStage: number;
-}): OptionVisualState {
-  if (answered) {
-    return option.value === question.answer ? 'correct' : 'disabled';
-  }
-
-  if (selectedOptionId === option.id) {
-    return option.value === question.answer ? 'correct' : 'wrong';
-  }
-
-  if (hintStage >= 3 && option.value === question.answer) {
-    return 'correct';
-  }
-
-  if (hintStage >= 2 && Math.abs(option.value - question.answer) <= 1) {
-    return 'hint';
-  }
-
-  return 'idle';
-}
-
-function mergeNumberSpirits(previous: NumberSpirit[], next: NumberSpirit[]) {
-  const merged = new Map<number, NumberSpirit>();
-
-  [...previous, ...next].forEach((spirit) => {
-    merged.set(spirit.value, spirit);
-  });
-
-  return [...merged.values()].sort((a, b) => a.value - b.value);
-}
-
-function createClientId(prefix: string) {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-
-  return `${prefix}-${Date.now().toString(36)}-${Math.random()
-    .toString(36)
-    .slice(2, 10)}`;
-}
-
-function LevelProgressStrip({ current, total }: { current: number; total: number }) {
-  const safeCurrent = Math.min(Math.max(current, 0), total);
-
-  return (
-    <div className="mx-auto w-full rounded-3xl bg-white/78 p-4 shadow-xl shadow-emerald-500/15 ring-2 ring-white backdrop-blur-xl">
-      <div className="mb-3 flex items-center justify-between gap-3 text-base font-black text-emerald-950">
-        <span>本关</span>
-        <span>{safeCurrent}/{total}</span>
-      </div>
-      <div
-        className="grid gap-1"
-        style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
-      >
-        {Array.from({ length: total }, (_, index) => (
-          <span
-            key={index}
-            className={`h-5 rounded-full ring-1 ring-white ${
-              index < safeCurrent
-                ? 'bg-gradient-to-r from-emerald-300 to-lime-400 shadow-md shadow-emerald-400/25'
-                : 'bg-emerald-50'
-            }`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+import {
+  EnglishModulePage,
+  LiteracyModulePage,
+  ProgrammingIslandPage,
+  StickerAlbumPage,
+  preloadLazyScene,
+  preloadSecondaryScenes,
+} from './app/lazyScenes';
+import {
+  CORRECT_ADVANCE_MIN_MS,
+  DEFAULT_LEVEL_QUESTION_GOAL,
+  FLOW_OBSERVER_TIMEOUT_MS,
+  FLOW_OBSERVER_URL,
+  INITIAL_STATS,
+  INTERIM_FLOW_EVALUATION_INTERVAL,
+  INTRO_TO_QUESTION_GAP_MS,
+  MAX_WRONG_ATTEMPTS_PER_QUESTION,
+  QUESTION_ENTRY_DELAY_MS,
+  QUESTION_IDLE_THRESHOLD_MS,
+  RAPID_CLICK_THRESHOLD_MS,
+  WRONG_FEEDBACK_MIN_MS,
+  WRONG_FINAL_ADVANCE_MIN_MS,
+  createClientId,
+  feedbackForCombo,
+  getOptionState,
+  hydrateLevelResult,
+  mergeNumberSpirits,
+  readStoredAppSnapshot,
+  readStoredScrollSnapshot,
+  readStoredStats,
+  writeStoredAppSnapshot,
+  writeStoredScrollSnapshot,
+  writeStoredStats,
+  type ActiveQuestionTelemetry,
+  type AppScene,
+  type FlowEvaluationTrigger,
+  type FlowObserverStatus,
+  type LevelResultSnapshot,
+  type PracticeRunMode,
+  type SessionStats,
+  type StoredAppSnapshot,
+} from './app/appState';
 
 export default function App() {
   useLearningStateSync();
@@ -691,6 +269,9 @@ export default function App() {
   const currentRunModeRef = useRef<PracticeRunMode>(
     initialAppSnapshot?.currentRunMode ?? 'level',
   );
+  const diagnosticRunSeedRef = useRef<number | null>(
+    initialAppSnapshot?.diagnosticRunSeed ?? null,
+  );
   const practiceRunIdRef = useRef<string | null>(
     initialAppSnapshot?.practiceRunId ?? null,
   );
@@ -764,6 +345,22 @@ export default function App() {
   useEffect(() => {
     reviewQueueRef.current = reviewQueue;
   }, [reviewQueue]);
+
+  useEffect(() => {
+    if (scene !== 'home') {
+      return undefined;
+    }
+
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(() => preloadSecondaryScenes(), {
+        timeout: 1800,
+      });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeoutId = setTimeout(preloadSecondaryScenes, 600);
+    return () => clearTimeout(timeoutId);
+  }, [scene]);
 
   const questionEventPayload = useCallback(
     (
@@ -1162,7 +759,7 @@ export default function App() {
 
   const generateAdaptiveQuestion = useCallback((difficulty: number, serial: number) => {
     if (currentRunModeRef.current === 'diagnostic' && serial < DIAGNOSTIC_QUESTION_COUNT) {
-      return getDiagnosticQuestion(serial);
+      return getDiagnosticQuestion(serial, diagnosticRunSeedRef.current ?? 1);
     }
 
     const queuedReview = reviewQueueRef.current[0];
@@ -1390,6 +987,7 @@ export default function App() {
       currentRunPolicy: currentRunPolicyRef.current,
       currentRunPolicyBatchId: currentRunPolicyBatchIdRef.current,
       currentRunMode: currentRunModeRef.current,
+      diagnosticRunSeed: diagnosticRunSeedRef.current,
     });
   }, [
     answered,
@@ -1466,11 +1064,13 @@ export default function App() {
     const startingPolicyBatchId = flowShadowReport?.batchId ?? null;
     const shouldRunDiagnostic = !readDiagnosticSnapshot();
     const runMode: PracticeRunMode = shouldRunDiagnostic ? 'diagnostic' : 'level';
+    const diagnosticSeed = shouldRunDiagnostic ? createDiagnosticRunSeed() : null;
     flowObserverRequestIdRef.current += 1;
     practiceRunIdRef.current = runId;
     currentRunPolicyRef.current = startingPolicy;
     currentRunPolicyBatchIdRef.current = startingPolicyBatchId;
     currentRunModeRef.current = runMode;
+    diagnosticRunSeedRef.current = diagnosticSeed;
     const difficulty = startingPolicy?.nextDifficulty ?? dda.difficulty;
     const levelPack = getLevelPackForDifficulty(difficulty);
     activeLevelPackIdRef.current = shouldRunDiagnostic ? null : levelPack.id;
@@ -1481,7 +1081,7 @@ export default function App() {
           levelPack.items.length,
         );
     const firstQuestion = shouldRunDiagnostic
-      ? getDiagnosticQuestion(0)
+      ? getDiagnosticQuestion(0, diagnosticSeed ?? 1)
       : generateAdaptiveQuestion(difficulty, 0);
     const line = buildStartVoiceLine();
 
@@ -1528,6 +1128,7 @@ export default function App() {
       levelPackTitle: shouldRunDiagnostic ? '入学小测' : levelPack.title,
       levelPackGoal: shouldRunDiagnostic ? '找到合适起点' : levelPack.shortGoal,
       runMode,
+      diagnosticSeed,
       flowState: startingPolicy?.finalState ?? null,
       flowAction: startingPolicy?.finalAction ?? null,
     });
@@ -1606,6 +1207,7 @@ export default function App() {
   }, [beginFlow, combo, stop, trackActiveQuestionAbandoned]);
 
   const handleOpenStickerAlbum = useCallback(() => {
+    preloadLazyScene('stickers');
     trackActiveQuestionAbandoned('stickers');
     beginFlow();
     stop();
@@ -1627,6 +1229,7 @@ export default function App() {
   ]);
 
   const handleOpenLiteracy = useCallback(() => {
+    preloadLazyScene('literacy');
     trackActiveQuestionAbandoned('literacy');
     beginFlow();
     stop();
@@ -1642,6 +1245,7 @@ export default function App() {
   }, [beginFlow, selectedLiteracyId, stop, trackActiveQuestionAbandoned]);
 
   const handleOpenEnglish = useCallback(() => {
+    preloadLazyScene('english');
     trackActiveQuestionAbandoned('english');
     beginFlow();
     stop();
@@ -1657,6 +1261,7 @@ export default function App() {
   }, [beginFlow, selectedEnglishId, stop, trackActiveQuestionAbandoned]);
 
   const handleOpenProgramming = useCallback(() => {
+    preloadLazyScene('programming');
     trackActiveQuestionAbandoned('programming');
     beginFlow();
     stop();
@@ -1725,20 +1330,53 @@ export default function App() {
   );
 
   const handleCompleteProgrammingLevel = useCallback(
-    (level: ProgrammingLevel) => {
+    (level: ProgrammingLevel, completion: ProgrammingCompletionResult) => {
       const isNewCompletion = programmingProgress.completeLevel(level);
       addToast(isNewCompletion ? `${level.title} 通关` : `${level.title} 已通关`);
+      if (isNewCompletion) {
+        if (completion.stars >= 3) {
+          const rankStars = rank.addStars(1);
+          track('programming.rank_awarded', {
+            levelId: level.id,
+            rankStars,
+            completionStars: completion.stars,
+            usedSteps: completion.usedSteps,
+            optimalSteps: completion.optimalSteps,
+          });
+        }
+        const sticker = stickers.grantByTrigger({
+          kind: 'programming_level_complete',
+          levelId: level.id,
+          stars: completion.stars,
+        });
+        if (sticker) {
+          addToast(`奖励贴纸：${sticker.name}`);
+          playStickerVoice(sticker);
+        }
+        rewardGarden.waterByStars(completion.stars);
+        combo.hit();
+      }
       track('programming.level_complete', {
         levelId: level.id,
         concept: level.concept,
+        completionStars: completion.stars,
+        usedSteps: completion.usedSteps,
+        optimalSteps: completion.optimalSteps,
         isNewCompletion,
       });
     },
-    [addToast, programmingProgress],
+    [addToast, combo, programmingProgress, playStickerVoice, rank, rewardGarden, stickers, track],
   );
 
   const handleStartPractice = useCallback(() => {
     resetLevelRun();
+  }, [resetLevelRun]);
+
+  const handleRestartDiagnostic = useCallback(() => {
+    clearDiagnosticSnapshot();
+    setParentReportOpen(false);
+    resetLevelRun();
+    track('diagnostic.reset_requested', {});
   }, [resetLevelRun]);
 
   const handleSound = useCallback(() => {
@@ -1759,7 +1397,7 @@ export default function App() {
           ? buildEnglishVoiceLine(selectedEnglishItem)
         : scene === 'programming'
           ? buildProgrammingVoiceLine(
-              '这里是光之编程馆。先放指令，再点运行，看看小光会怎么走。',
+              '这里是编程岛。先放指令，再点运行，看看小满会怎么走。',
             )
         : buildHomeVoiceLine({
             rankName: rank.rank.name,
@@ -1832,6 +1470,7 @@ export default function App() {
         recommendedDifficulty: score.recommendedDifficulty,
         correctCount: score.correctCount,
         firstTryCorrectCount: score.firstTryCorrectCount,
+        runSeed: diagnosticRunSeedRef.current ?? undefined,
       });
       dda.applyDiagnosticResult(score.recommendedDifficulty);
       const gardenReward = rewardGarden.claimLevelCompletion({
@@ -1854,6 +1493,7 @@ export default function App() {
       };
 
       currentRunModeRef.current = 'level';
+      diagnosticRunSeedRef.current = null;
       combo.endRun();
       setLevelStarsEarned(0);
       setLastResult(result);
@@ -1925,6 +1565,7 @@ export default function App() {
       };
 
       currentRunModeRef.current = 'level';
+      diagnosticRunSeedRef.current = null;
       combo.endRun();
       setLevelStarsEarned(rankStarsAwarded);
       setLastResult(result);
@@ -1976,18 +1617,21 @@ export default function App() {
       }
 
       const isCorrect = option.value === question.answer;
+      const isDiagnosticRun = currentRunModeRef.current === 'diagnostic';
       const nextHintStage = isCorrect ? hintStage : Math.min(hintStage + 1, 3);
       const attemptTelemetry = recordAnswerAttempt(question, option, nextHintStage);
       setSelectedOptionId(option.id);
-      setStats((previous) => {
-        const next = {
-          attempted: previous.attempted + 1,
-          correct: previous.correct + (isCorrect ? 1 : 0),
-          hintsUsed: previous.hintsUsed + (isCorrect ? 0 : 1),
-        };
-        writeStoredStats(next);
-        return next;
-      });
+      if (!isDiagnosticRun) {
+        setStats((previous) => {
+          const next = {
+            attempted: previous.attempted + 1,
+            correct: previous.correct + (isCorrect ? 1 : 0),
+            hintsUsed: previous.hintsUsed + (isCorrect ? 0 : 1),
+          };
+          writeStoredStats(next);
+          return next;
+        });
+      }
 
       track(
         'question.answer',
@@ -2039,16 +1683,21 @@ export default function App() {
           completedAttemptRecord,
         ];
         levelAttemptRecordsRef.current = nextAttemptRecords;
-        ability.recordAttempt(completedAttemptRecord);
-        recordLearningHistory(completedAttemptRecord);
+        if (!isDiagnosticRun) {
+          ability.recordAttempt(completedAttemptRecord);
+          recordLearningHistory(completedAttemptRecord);
+        }
         const flowId = beginFlow();
-        const nextDda = dda.onCorrect();
-        const nextCombo = combo.hit();
+        const nextDda = isDiagnosticRun
+          ? dda
+          : dda.onCorrect(deriveQuestionDifficultyTags(question));
+        const nextCombo = isDiagnosticRun ? 0 : combo.hit();
         const level = feedbackForCombo(nextCombo);
-        const firstWin = daily.claim();
+        const firstWin = isDiagnosticRun ? false : daily.claim();
         const stickerUnlockEligible = shouldOfferStickerUnlock({
           combo: nextCombo,
-          firstAttemptCorrect: completedAttemptRecord.firstAttemptCorrect,
+          firstAttemptCorrect:
+            !isDiagnosticRun && completedAttemptRecord.firstAttemptCorrect,
         });
         track('sticker.unlock_check', {
           eligible: stickerUnlockEligible,
@@ -2061,7 +1710,9 @@ export default function App() {
               stats.correct + questionIndex + nextCombo + (firstWin ? 13 : 0),
             )
           : null;
-        const newlyUnlockedSpirits = numberSpirits.recordQuestion(question);
+        const newlyUnlockedSpirits = isDiagnosticRun
+          ? []
+          : numberSpirits.recordQuestion(question);
         const nextLevelNewSpirits = mergeNumberSpirits(
           levelNewSpirits,
           newlyUnlockedSpirits,
@@ -2078,7 +1729,8 @@ export default function App() {
           currentRunPolicyRef.current?.nextDifficulty ??
           nextDda.difficulty;
         const comboRemaining = Math.max((nextCombo >= 5 ? 10 : 5) - nextCombo, 0);
-        const nextChestRemaining = chestGoal - ((stats.correct + 1) % chestGoal || chestGoal);
+        const nextCorrectCount = stats.correct + (isDiagnosticRun ? 0 : 1);
+        const nextChestRemaining = chestGoal - (nextCorrectCount % chestGoal || chestGoal);
 
         setLevelProgress(nextLevelProgress);
         setLevelBestCombo(nextLevelBestCombo);
@@ -2096,7 +1748,7 @@ export default function App() {
               : newlyUnlockedSpirits.length > 0
                 ? `${newlyUnlockedSpirits[0].emoji} 数字 ${newlyUnlockedSpirits[0].value} 果灵醒了`
               : comboRemaining === 0
-                ? `COMBO ×${nextCombo} 里程碑`
+                ? `连对 ${nextCombo} 题`
                 : `再答对 ${nextChestRemaining} 题开宝箱`,
         );
         const correctFeedbackStartedAt = Date.now();
@@ -2110,7 +1762,9 @@ export default function App() {
             combo: nextCombo,
           }),
         );
-        celebrate(level);
+        if (!isDiagnosticRun) {
+          celebrate(level);
+        }
         playPositiveFeedback(level);
         const line = buildCorrectVoiceLine({
           question,
@@ -2171,8 +1825,12 @@ export default function App() {
       }
 
       const flowId = beginFlow();
-      combo.miss();
-      const nextDda = dda.onWrong();
+      if (!isDiagnosticRun) {
+        combo.miss();
+      }
+      const nextDda = isDiagnosticRun
+        ? dda
+        : dda.onWrong(deriveQuestionDifficultyTags(question));
       const nextLevelMistakes = levelMistakes + 1;
       const shouldFinalizeWrong =
         (attemptTelemetry?.attemptCount ?? 0) >= MAX_WRONG_ATTEMPTS_PER_QUESTION;
@@ -2231,8 +1889,10 @@ export default function App() {
           completedAttemptRecord,
         ];
         levelAttemptRecordsRef.current = nextAttemptRecords;
-        ability.recordAttempt(completedAttemptRecord);
-        recordLearningHistory(completedAttemptRecord);
+        if (!isDiagnosticRun) {
+          ability.recordAttempt(completedAttemptRecord);
+          recordLearningHistory(completedAttemptRecord);
+        }
         const nextLevelProgress = levelProgress + 1;
         const interimFlowPolicy = maybeCreateInterimFlowPolicy(
           nextAttemptRecords,
@@ -2391,27 +2051,6 @@ export default function App() {
       ref={mainRef}
       className={`app-shell relative overflow-x-hidden overflow-y-auto overscroll-y-contain bg-gradient-to-b ${currentSkin.gradient || BG.mint}`}
     >
-      <FloatingDecoration emoji="☁️" className="left-[10%] top-[8%] z-0 text-7xl opacity-25" />
-      <FloatingDecoration
-        emoji="🌈"
-        className={
-          scene === 'practice'
-            ? 'hidden'
-            : 'right-[14%] top-[18%] z-0 text-6xl opacity-20'
-        }
-        delay={0.4}
-      />
-      <FloatingDecoration
-        emoji="⭐"
-        className="bottom-[16%] left-[18%] z-0 text-5xl opacity-30"
-        delay={0.8}
-      />
-      <FloatingDecoration
-        emoji="🍃"
-        className="bottom-[10%] right-[18%] z-0 text-6xl opacity-25"
-        delay={1.2}
-      />
-
       <TopBar
         combo={scene === 'practice' ? combo.current : 0}
         themeName={
@@ -2441,11 +2080,10 @@ export default function App() {
             correct={stats.correct}
             attempted={stats.attempted}
             difficulty={dda.difficulty}
-	            stickers={stickers.collected}
-	            stickerTotal={stickers.total}
-	            stickerSeriesProgress={stickers.seriesProgress}
-	            duplicateShards={stickers.duplicateShards}
-	            skins={skins}
+            stickers={stickers.collected}
+            stickerTotal={stickers.total}
+            duplicateShards={stickers.duplicateShards}
+            skins={skins}
             levelProgress={levelProgress}
             levelGoal={homeLevelGoal}
             garden={rewardGarden.garden}
@@ -2493,10 +2131,10 @@ export default function App() {
         ) : scene === 'stickers' ? (
           <StickerAlbumPage
             key="stickers"
-	            stickers={stickers.collected}
-	            stickerTotal={stickers.total}
-	            seriesProgress={stickers.seriesProgress}
-	            onBack={handleHome}
+            stickers={stickers.collected}
+            stickerTotal={stickers.total}
+            seriesProgress={stickers.seriesProgress}
+            onBack={handleHome}
             onInspectSticker={handleInspectSticker}
           />
         ) : scene === 'result' && lastResult ? (
@@ -2518,52 +2156,21 @@ export default function App() {
             onInspectSticker={handleInspectSticker}
           />
         ) : (
-          <motion.section
+          <PracticeSession
             key="practice"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-            className="ipad-practice-grid relative z-10 mx-auto grid w-full max-w-7xl gap-5 pb-24"
-          >
-            <div className="flex min-w-0 flex-col gap-5">
-              <QuestionCard question={question} answered={answered} />
-
-              <HintLadder question={question} stage={hintStage} />
-            </div>
-
-            <aside className="ipad-answer-rail flex min-w-0 flex-col gap-4">
-              <LevelProgressStrip current={levelProgress} total={levelQuestionGoal} />
-
-              <div className="ipad-options-grid mx-auto grid w-full gap-4">
-                {optionStates.map(({ option, state }, index) => (
-                  <OptionButton
-                    key={`${question.id}-${option.id}`}
-                    option={option}
-                    state={state}
-                    paletteIndex={index}
-                    visualEmoji={question.theme?.emoji ?? question.objects[0] ?? '✦'}
-                    onSelect={handleSelect}
-                  />
-                ))}
-              </div>
-
-              <div className="ipad-session-stats mx-auto grid w-full gap-3">
-                <Stat label="段位" value={rank.rank.name}>
-                  <Award size={28} strokeWidth={3.2} />
-                </Stat>
-                <Stat label="小星" value={rank.rank.starLabel}>
-                  <Star size={28} strokeWidth={3.2} />
-                </Stat>
-                <Stat label="奥特贴纸" value={`${stickers.collected.length}/${stickers.total}`}>
-                  <Sparkles size={28} strokeWidth={3.2} />
-                </Stat>
-                <Stat label="难度" value={String(dda.difficulty)}>
-                  <Gem size={28} strokeWidth={3.2} />
-                </Stat>
-              </div>
-            </aside>
-          </motion.section>
+            question={question}
+            answered={answered}
+            hintStage={hintStage}
+            levelProgress={levelProgress}
+            levelQuestionGoal={levelQuestionGoal}
+            optionStates={optionStates}
+            rankName={rank.rank.name}
+            rankStars={rank.rank.starLabel}
+            stickerCount={stickers.collected.length}
+            stickerTotal={stickers.total}
+            difficulty={dda.difficulty}
+            onSelect={handleSelect}
+          />
         )}
       </AnimatePresence>
       </Suspense>
@@ -2581,33 +2188,10 @@ export default function App() {
         ) : null}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {answered && feedback !== 'wrong' ? (
-          <motion.span
-            key={question.id}
-            initial={{
-              top: '50%',
-              left: '50%',
-              scale: 1.5,
-              opacity: 1,
-            }}
-            animate={{
-              top: '6rem',
-              left: 'calc(100vw - 4rem)',
-              scale: 0.6,
-              opacity: 0,
-            }}
-            transition={{ duration: 0.8, ease: 'easeIn' }}
-            className="pointer-events-none fixed z-40 text-5xl drop-shadow-xl"
-          >
-            💎
-          </motion.span>
-        ) : null}
-      </AnimatePresence>
-
       <ParentReportPanel
         open={parentReportOpen}
         onClose={() => setParentReportOpen(false)}
+        onRestartDiagnostic={handleRestartDiagnostic}
         correct={stats.correct}
         attempted={stats.attempted}
         maxCombo={combo.maxEver}

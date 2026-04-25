@@ -14,7 +14,15 @@ export interface TrackingDetail extends TrackingContext {
 const CONFIGURED_TELEMETRY_URL = import.meta.env.VITE_TELEMETRY_URL?.trim();
 const TELEMETRY_QUEUE_STORAGE_KEY = 'childlearn.telemetry-queue-v1';
 const MAX_QUEUED_EVENTS = 200;
+const BASE_RETRY_DELAY_MS = 5_000;
+const MAX_RETRY_DELAY_MS = 5 * 60_000;
 let flushListenersInstalled = false;
+
+interface QueuedTelemetryEvent {
+  detail: TrackingDetail;
+  failedAttempts: number;
+  nextRetryAt: number;
+}
 
 export function createTrackingDetail(
   name: string,
@@ -32,7 +40,26 @@ function getTelemetryUrl() {
   return resolveRuntimeUrl(CONFIGURED_TELEMETRY_URL);
 }
 
-function readQueuedTelemetry(): TrackingDetail[] {
+function normalizeQueuedTelemetryEvent(value: unknown): QueuedTelemetryEvent | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const maybeQueued = value as Partial<QueuedTelemetryEvent>;
+  const detail = 'detail' in maybeQueued ? maybeQueued.detail : (value as TrackingDetail);
+
+  if (!detail || typeof detail !== 'object' || typeof detail.name !== 'string') {
+    return null;
+  }
+
+  return {
+    detail: detail as TrackingDetail,
+    failedAttempts: Math.max(0, Math.round(Number(maybeQueued.failedAttempts ?? 0))),
+    nextRetryAt: Math.max(0, Math.round(Number(maybeQueued.nextRetryAt ?? 0))),
+  };
+}
+
+function readQueuedTelemetry(): QueuedTelemetryEvent[] {
   if (typeof window === 'undefined') {
     return [];
   }
@@ -40,14 +67,19 @@ function readQueuedTelemetry(): TrackingDetail[] {
   try {
     const parsed = JSON.parse(
       window.localStorage.getItem(TELEMETRY_QUEUE_STORAGE_KEY) ?? '[]',
-    ) as TrackingDetail[];
-    return Array.isArray(parsed) ? parsed.slice(-MAX_QUEUED_EVENTS) : [];
+    ) as unknown[];
+    return Array.isArray(parsed)
+      ? parsed
+          .map(normalizeQueuedTelemetryEvent)
+          .filter((event): event is QueuedTelemetryEvent => Boolean(event))
+          .slice(-MAX_QUEUED_EVENTS)
+      : [];
   } catch {
     return [];
   }
 }
 
-function writeQueuedTelemetry(events: TrackingDetail[]) {
+function writeQueuedTelemetry(events: QueuedTelemetryEvent[]) {
   if (typeof window === 'undefined') {
     return;
   }
@@ -58,8 +90,19 @@ function writeQueuedTelemetry(events: TrackingDetail[]) {
   );
 }
 
-function enqueueTelemetry(detail: TrackingDetail) {
-  writeQueuedTelemetry([...readQueuedTelemetry(), detail]);
+function retryDelayFor(failedAttempts: number) {
+  return Math.min(BASE_RETRY_DELAY_MS * 2 ** Math.max(failedAttempts - 1, 0), MAX_RETRY_DELAY_MS);
+}
+
+function enqueueTelemetry(detail: TrackingDetail, failedAttempts = 0) {
+  writeQueuedTelemetry([
+    ...readQueuedTelemetry(),
+    {
+      detail,
+      failedAttempts,
+      nextRetryAt: Date.now() + retryDelayFor(failedAttempts),
+    },
+  ]);
 }
 
 async function postTrackingDetail(telemetryUrl: string, detail: TrackingDetail) {
@@ -88,12 +131,29 @@ export function flushQueuedTelemetry() {
     return;
   }
 
-  writeQueuedTelemetry([]);
-  void Promise.all(queued.map((detail) => postTrackingDetail(telemetryUrl, detail))).catch(
-    () => {
-      writeQueuedTelemetry([...readQueuedTelemetry(), ...queued].slice(-MAX_QUEUED_EVENTS));
-    },
-  );
+  const now = Date.now();
+  const due = queued.filter((event) => event.nextRetryAt <= now);
+  const waiting = queued.filter((event) => event.nextRetryAt > now);
+  if (due.length === 0) {
+    return;
+  }
+
+  writeQueuedTelemetry(waiting);
+  void Promise.allSettled(
+    due.map((event) => postTrackingDetail(telemetryUrl, event.detail)),
+  ).then((results) => {
+    const failed = due
+      .filter((_, index) => results[index]?.status === 'rejected')
+      .map((event) => ({
+        detail: event.detail,
+        failedAttempts: event.failedAttempts + 1,
+        nextRetryAt: Date.now() + retryDelayFor(event.failedAttempts + 1),
+      }));
+
+    if (failed.length > 0) {
+      writeQueuedTelemetry([...readQueuedTelemetry(), ...failed].slice(-MAX_QUEUED_EVENTS));
+    }
+  });
 }
 
 function installTelemetryFlushListeners() {

@@ -27,8 +27,8 @@ const config: Record<
     className: 'from-fuchsia-500 via-purple-500 to-indigo-500 shadow-purple-400/60',
   },
   wrong: {
-    text: '再想想',
-    className: 'from-rose-300 to-pink-500 shadow-rose-400/50',
+    text: '没关系哦',
+    className: 'from-orange-300 to-amber-400 shadow-orange-300/50',
   },
 };
 
@@ -43,9 +43,9 @@ export function FeedbackBadge({ level }: FeedbackBadgeProps) {
       {level ? (
         <motion.div
           key={level}
-          initial={{ opacity: 0, scale: 0.35, rotate: -18, y: 20 }}
+          initial={{ opacity: 0, scale: 0.94, rotate: -2, y: 12 }}
           animate={{ opacity: 1, scale: 1, rotate: 0, y: 0 }}
-          exit={{ opacity: 0, scale: 0.7, y: -24 }}
+          exit={{ opacity: 0, scale: 0.96, y: -12 }}
           transition={SPRING.jelly}
           className={`${positionClass} fixed left-1/2 z-40 -translate-x-1/2 rounded-full bg-gradient-to-r px-8 py-4 text-4xl font-black text-white shadow-2xl ring-4 ring-white ${config[level].className}`}
         >

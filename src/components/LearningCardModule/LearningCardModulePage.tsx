@@ -95,13 +95,6 @@ export function LearningCardModulePage<TCard extends LearningCard>({
       className="relative z-10 mx-auto w-full max-w-7xl pb-24"
     >
       <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/88 p-5 shadow-[0_24px_80px_rgba(15,118,110,0.14)] ring-1 ring-emerald-900/5 backdrop-blur-xl md:p-6">
-        <div className="pointer-events-none absolute -right-8 -top-10 text-[8rem] font-black tracking-normal text-emerald-500 opacity-10">
-          {selectedCard.glyph}
-        </div>
-        <div className="pointer-events-none absolute bottom-2 left-[42%] text-7xl text-amber-400 opacity-10">
-          {selectedCard.graphic}
-        </div>
-
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
@@ -175,7 +168,7 @@ export function LearningCardModulePage<TCard extends LearningCard>({
                     {selectedCard.imageLabel}
                   </h2>
                 </div>
-                <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] bg-emerald-50 text-7xl shadow-inner ring-1 ring-emerald-100">
+                <div className="flex h-32 w-32 items-center justify-center rounded-[2rem] bg-emerald-50 text-5xl shadow-inner ring-1 ring-emerald-100">
                   {selectedCard.graphic}
                 </div>
               </div>

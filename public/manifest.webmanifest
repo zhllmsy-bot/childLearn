@@ -1,13 +1,38 @@
 {
-  "name": "childLearn 数感练习",
-  "short_name": "childLearn",
-  "description": "儿童数感练习、复习包和家长报告",
+  "name": "果园数感岛",
+  "short_name": "数感岛",
+  "description": "面向 4-6 岁孩子的儿童数感练习、复习包和家长报告",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#bbf7d0",
-  "theme_color": "#10b981",
+  "background_color": "#FFF9EF",
+  "theme_color": "#3EA02D",
+  "categories": ["education", "kids", "games"],
   "icons": [
+    {
+      "src": "/icons/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/favicon.svg",
       "sizes": "any",

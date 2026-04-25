@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Xiaoman apple friend cheer">
+  <rect width="240" height="240" rx="42" fill="#FFF9EF"/>
+  <ellipse cx="120" cy="213" rx="58" ry="12" fill="#183024" opacity=".10"/>
+  <path d="M128 48c18-25 36-24 52-12-7 23-29 32-52 12Z" fill="#7FC86A" stroke="#183024" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M119 58c7-18 7-29 1-40" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="5" stroke-linecap="round"/>
+  <path d="M58 116c0-44 28-72 62-72s62 28 62 72c0 50-29 84-62 84s-62-34-62-84Z" fill="#E24B3F" stroke="#183024" stroke-opacity=".8" stroke-width="6"/>
+  <circle cx="96" cy="119" r="16" fill="#FFF9EF" stroke="#183024" stroke-opacity=".8" stroke-width="5"/>
+  <circle cx="144" cy="119" r="16" fill="#FFF9EF" stroke="#183024" stroke-opacity=".8" stroke-width="5"/>
+  <circle cx="101" cy="120" r="6" fill="#183024"/>
+  <circle cx="139" cy="120" r="6" fill="#183024"/>
+  <circle cx="82" cy="145" r="12" fill="#FFD9C2" opacity=".9"/>
+  <circle cx="158" cy="145" r="12" fill="#FFD9C2" opacity=".9"/>
+  <path d="M99 150c11 16 31 16 42 0" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M66 139c-25-17-34-35-27-55" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M174 139c25-17 34-35 27-55" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M94 199c-8 12-17 16-28 17" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M146 199c8 12 17 16 28 17" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M42 70l10 18 20 2-15 13 5 20-18-10-18 10 5-20-15-13 20-2Z" fill="#FFB200" opacity=".9"/>
+  <path d="M178 70l8 15 17 2-13 11 4 17-16-8-15 8 4-17-13-11 17-2Z" fill="#FFD257" opacity=".9"/>
+</svg>

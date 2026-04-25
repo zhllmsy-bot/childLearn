@@ -19,17 +19,17 @@ interface OptionButtonProps {
 }
 
 const IDLE_PALETTE = [
-  'from-rose-300 to-rose-400 shadow-rose-400/40',
-  'from-sky-300 to-sky-500 shadow-sky-400/40',
-  'from-amber-300 to-orange-400 shadow-amber-400/40',
-  'from-violet-300 to-purple-500 shadow-violet-400/40',
+  'bg-[#EAF4FF] text-[#1457AE] shadow-[#2E8CF0]/18 ring-[#C2E0FF]',
+  'bg-[#EAF9E6] text-[#1E6B13] shadow-[#3EA02D]/18 ring-[#C8EDBC]',
+  'bg-[#FFF7E1] text-[#7A5100] shadow-[#FFB200]/22 ring-[#FFECB0]',
+  'bg-[#FFF1EA] text-[#8F3514] shadow-[#F77444]/18 ring-[#FFD9C2]',
 ] as const;
 
 const stateClass: Record<Exclude<OptionVisualState, 'idle'>, string> = {
   correct:
     'bg-gradient-to-br from-emerald-300 to-teal-500 text-white shadow-emerald-400/60 ring-emerald-100',
   wrong:
-    'bg-gradient-to-br from-slate-300 to-slate-400 text-white opacity-70 shadow-slate-400/40 ring-slate-100',
+    'bg-gradient-to-br from-orange-300 to-amber-400 text-white shadow-orange-300/50 ring-orange-100',
   disabled:
     'bg-gradient-to-br from-slate-100 to-slate-200 text-slate-400 opacity-50 shadow-slate-300/30 ring-slate-100',
   hint: 'bg-gradient-to-br from-yellow-300 to-amber-400 text-white shadow-amber-400/60 ring-white',
@@ -39,7 +39,7 @@ function OptionButtonComponent({
   option,
   state,
   paletteIndex = 0,
-  visualEmoji = '✦',
+  visualEmoji = '•',
   onSelect,
 }: OptionButtonProps) {
   const reduceMotion = useReducedMotion();
@@ -47,7 +47,7 @@ function OptionButtonComponent({
   const isIdle = state === 'idle' || state === 'hint';
   const visualClass =
     state === 'idle'
-      ? `bg-gradient-to-br ${IDLE_PALETTE[paletteIndex % IDLE_PALETTE.length]} text-white ring-white`
+      ? IDLE_PALETTE[paletteIndex % IDLE_PALETTE.length]
       : stateClass[state];
 
   return (
@@ -60,9 +60,9 @@ function OptionButtonComponent({
         reduceMotion
           ? { x: 0, scale: 1, rotate: 0 }
           : state === 'wrong'
-          ? { x: [-12, 12, -12, 12, 0] }
+          ? { x: [-4, 4, -3, 3, 0], rotate: [-1.5, 1.5, -1, 1, 0] }
           : state === 'correct'
-            ? { scale: [1, 1.18, 1], rotate: [0, -3, 2, 0] }
+            ? { scale: [1, 1.08, 1], rotate: [0, -2, 1, 0] }
             : { x: 0, scale: 1 }
       }
       transition={state === 'correct' ? SPRING.celebrate : SPRING.bounce}
@@ -73,14 +73,14 @@ function OptionButtonComponent({
       className={`ipad-option-button relative flex h-32 flex-col items-center justify-center gap-1 rounded-3xl px-8 py-5 shadow-xl ring-2 outline-none focus-visible:ring-4 focus-visible:ring-emerald-900 md:h-44 ${visualClass}`}
     >
       {state === 'hint' ? (
-        <span className="absolute right-3 top-3 rounded-full bg-white/88 px-2 py-1 text-xs font-black text-amber-800 shadow-sm ring-1 ring-amber-100">
+        <span className="absolute right-3 top-3 rounded-full bg-white/88 px-2 py-1 text-base font-bold text-amber-800 shadow-sm ring-1 ring-amber-100">
           接近
         </span>
       ) : null}
-      <span className="text-2xl drop-shadow-md" aria-hidden="true">
+      <span className="text-2xl text-current/70" aria-hidden="true">
         {visualEmoji}
       </span>
-      <span className="text-5xl font-black text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.15)] md:text-6xl">
+      <span className="text-5xl font-black text-current md:text-6xl">
         {option.label}
       </span>
     </motion.button>

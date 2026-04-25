@@ -50,6 +50,37 @@ const RARITY_LABELS: Record<StickerRarity, string> = {
   legendary: '传说',
 };
 
+const LEGENDARY_STICKER_IDS = new Set([
+  'm78-ultraman-king',
+  'm78-ultraman-noa',
+  'm78-ultraman-legend',
+  'm78-ultraman-reiga',
+]);
+
+const EPIC_STICKER_IDS = new Set([
+  'm78-father',
+  'm78-mother',
+  'm78-ultraman-saga',
+  'm78-ultraman-ginga-victory',
+  'm78-ultraman-ruebe',
+  'm78-ultraman-groob',
+  'm78-ultraman-belial',
+  'm78-ultraman-tregear',
+  'm78-dark-zagi',
+  'm78-ultraman-shadow',
+]);
+
+const RARE_STICKER_GROUPS = new Set([
+  '宇宙警备队',
+  '光之国',
+  '平成奥特',
+  '新生代前辈',
+  '银河救援队',
+  '黑暗巨人',
+  '海外奥特',
+  '机械与伪装',
+]);
+
 export function shouldOfferStickerUnlock({
   combo,
   firstAttemptCorrect,
@@ -62,6 +93,14 @@ export function shouldOfferStickerUnlock({
     combo > 0 &&
     combo % STICKER_UNLOCK_COMBO_INTERVAL === 0
   );
+}
+
+export type StickerTriggerKind = 'programming_level_complete';
+
+export interface StickerTriggerInput {
+  kind: StickerTriggerKind;
+  levelId: string;
+  stars: number;
 }
 
 const LEGACY_STICKER_LIBRARY: Sticker[] = [
@@ -261,16 +300,29 @@ const LEGACY_STICKER_LIBRARY: Sticker[] = [
 
 export const STICKER_LIBRARY = ultraStickerCatalog as Sticker[];
 
-function rarityForIndex(index: number): StickerRarity {
-  if (index % 31 === 0) {
+function hashToSeed(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function rarityForSticker(sticker: Sticker): StickerRarity {
+  if (sticker.rarity) {
+    return sticker.rarity;
+  }
+
+  if (LEGENDARY_STICKER_IDS.has(sticker.id)) {
     return 'legendary';
   }
 
-  if (index % 11 === 0) {
+  if (EPIC_STICKER_IDS.has(sticker.id)) {
     return 'epic';
   }
 
-  if (index % 4 === 0) {
+  if (RARE_STICKER_GROUPS.has(sticker.group)) {
     return 'rare';
   }
 
@@ -278,8 +330,7 @@ function rarityForIndex(index: number): StickerRarity {
 }
 
 export function getStickerMeta(sticker: Sticker) {
-  const index = STICKER_LIBRARY.findIndex((item) => item.id === sticker.id);
-  const rarity = sticker.rarity ?? rarityForIndex(Math.max(index, 0));
+  const rarity = rarityForSticker(sticker);
   const series = sticker.series ?? sticker.group;
 
   return {
@@ -307,6 +358,25 @@ export function findStickerById(id: string | null | undefined) {
   return sticker ? hydrateStickerMeta(sticker) : null;
 }
 
+function pityCounterFromCollectedIds(ids: string[]) {
+  let pityCounter = 0;
+
+  for (let index = ids.length - 1; index >= 0; index -= 1) {
+    const sticker = findStickerById(ids[index]);
+    if (!sticker) {
+      continue;
+    }
+
+    if (getStickerMeta(sticker).rarity !== 'common') {
+      break;
+    }
+
+    pityCounter += 1;
+  }
+
+  return Math.min(pityCounter, 7);
+}
+
 function readStoredStickerProgress(): StickerProgressState {
   if (typeof window === 'undefined') {
     return INITIAL_PROGRESS;
@@ -329,10 +399,20 @@ function readStoredStickerProgress(): StickerProgressState {
     // Fall through to legacy migration.
   }
 
-  return {
+  const legacyIds = [...readStoredStickerIds()];
+  const migrated = {
     ...INITIAL_PROGRESS,
-    collectedIds: [...readStoredStickerIds()],
+    collectedIds: legacyIds,
+    pityCounter: pityCounterFromCollectedIds(legacyIds),
   };
+  writeStoredStickerProgress(migrated);
+  track('sticker.progress_migrated', {
+    fromSchema: 1,
+    toSchema: 2,
+    collected: migrated.collectedIds.length,
+    pityCounter: migrated.pityCounter,
+  });
+  return migrated;
 }
 
 function writeStoredStickerProgress(state: StickerProgressState) {
@@ -341,7 +421,6 @@ function writeStoredStickerProgress(state: StickerProgressState) {
   }
 
   window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(state));
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.collectedIds));
   scheduleLearningStateSync('stickers');
 }
 
@@ -415,15 +494,6 @@ function readStoredStickerIds() {
   }
 }
 
-function writeStoredStickerIds(ids: Set<string>) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
-  scheduleLearningStateSync('stickers');
-}
-
 export function useStickers() {
   const [progress, setProgress] = useState<StickerProgressState>(
     readStoredStickerProgress,
@@ -478,6 +548,79 @@ export function useStickers() {
     return sticker;
   }, [progress.collectedIds, progress.pityCounter]);
 
+  const collectByRarity = useCallback((seed: number, rarity: StickerRarity) => {
+    let awarded: Sticker | null = null;
+
+    setProgress((previous) => {
+      const collectedIds = new Set(previous.collectedIds);
+      const sticker = findCollectibleSticker(seed, collectedIds, rarity);
+
+      if (!sticker) {
+        const fallback = STICKER_LIBRARY[Math.abs(seed) % STICKER_LIBRARY.length];
+        const next = {
+          ...previous,
+          duplicateShards: previous.duplicateShards + 1,
+        };
+        track('sticker.collect_skipped', {
+          stickerId: fallback?.id,
+          reason: 'complete_or_duplicate',
+        });
+        writeStoredStickerProgress(next);
+        return next;
+      }
+
+      if (previous.collectedIds.includes(sticker.id)) {
+        const next = {
+          ...previous,
+          duplicateShards: previous.duplicateShards + 1,
+        };
+        track('sticker.collect_skipped', {
+          stickerId: sticker.id,
+          reason: 'complete_or_duplicate',
+        });
+        writeStoredStickerProgress(next);
+        return next;
+      }
+
+      const nextSticker = hydrateStickerMeta(sticker);
+      const next: StickerProgressState = {
+        schemaVersion: 2,
+        collectedIds: [...previous.collectedIds, sticker.id],
+        pityCounter: getStickerMeta(sticker).rarity === 'common' ? previous.pityCounter + 1 : 0,
+        duplicateShards: previous.duplicateShards,
+      };
+
+      awarded = nextSticker;
+      writeStoredStickerProgress(next);
+      track('sticker.collect', {
+        stickerId: sticker.id,
+        rarity: getStickerMeta(sticker).rarity,
+        series: getStickerMeta(sticker).series,
+        totalCollected: next.collectedIds.length,
+      });
+      return next;
+    });
+
+    return awarded;
+  }, []);
+
+  const grantByTrigger = useCallback((trigger: StickerTriggerInput) => {
+    if (trigger.kind !== 'programming_level_complete') {
+      return null;
+    }
+
+    const stars = Math.max(1, Math.min(3, Math.round(trigger.stars)));
+    const preferredRarity = stars >= 3 ? 'epic' : 'common';
+    const seed = hashToSeed(`${trigger.kind}:${trigger.levelId}:${stars}`);
+    let sticker = collectByRarity(seed, preferredRarity);
+
+    if (!sticker && preferredRarity === 'epic') {
+      sticker = collectByRarity(seed + 1, 'rare');
+    }
+
+    return sticker ?? collectBySeed(seed);
+  }, [collectByRarity, collectBySeed]);
+
   const reset = useCallback(() => {
     writeStoredStickerProgress(INITIAL_PROGRESS);
     setProgress(INITIAL_PROGRESS);
@@ -504,6 +647,8 @@ export function useStickers() {
       pityCounter: progress.pityCounter,
       seriesProgress,
       collectBySeed,
+      collectByRarity,
+      grantByTrigger,
       reset,
     }),
     [
@@ -511,6 +656,8 @@ export function useStickers() {
       collected,
       progress.duplicateShards,
       progress.pityCounter,
+      collectByRarity,
+      grantByTrigger,
       reset,
       seriesProgress,
     ],

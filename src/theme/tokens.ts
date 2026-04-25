@@ -1,26 +1,26 @@
 export const BG = {
-  mint: 'from-emerald-200 via-lime-200 to-yellow-200',
-  sky: 'from-sky-200 via-blue-300 to-indigo-400',
-  sunset: 'from-orange-200 via-pink-300 to-rose-400',
-  candy: 'from-pink-200 via-purple-300 to-indigo-400',
-  forest: 'from-emerald-200 via-teal-300 to-cyan-400',
-  space: 'from-slate-900 via-purple-900 to-indigo-900',
+  mint: 'from-[#FFF9EF] via-[#EAF9E6] to-[#FFECB0]',
+  sky: 'from-[#EAF4FF] via-[#C2E0FF] to-[#EAF9E6]',
+  sunset: 'from-[#FFF1EA] via-[#FFD9C2] to-[#FFECB0]',
+  candy: 'from-[#FCEEFA] via-[#FFD9C2] to-[#EAF4FF]',
+  forest: 'from-[#EAF9E6] via-[#C8EDBC] to-[#EAF4FF]',
+  space: 'from-[#183024] via-[#1457AE] to-[#7F2C71]',
 } as const;
 
 export const ACCENT = {
-  primary: 'from-amber-400 to-orange-500',
-  success: 'from-emerald-300 to-teal-500',
-  danger: 'from-rose-300 to-pink-500',
-  gold: 'from-yellow-300 to-amber-500',
-  magic: 'from-fuchsia-500 via-purple-500 to-indigo-500',
+  primary: 'from-[#2E8CF0] to-[#7BBBFF]',
+  success: 'from-[#3EA02D] to-[#7FC86A]',
+  danger: 'from-[#F77444] to-[#FFA47A]',
+  gold: 'from-[#FFB200] to-[#FFD257]',
+  magic: 'from-[#C85AB5] to-[#EC8FDE]',
 } as const;
 
 export const SHADOW = {
-  card: 'shadow-2xl shadow-indigo-500/20',
+  card: 'shadow-2xl shadow-emerald-500/16',
   mint: 'shadow-2xl shadow-emerald-500/20',
   glow: 'shadow-xl shadow-amber-400/50',
   hot: 'shadow-2xl shadow-emerald-400/60',
-  danger: 'shadow-2xl shadow-rose-400/60',
+  danger: 'shadow-2xl shadow-[#F77444]/45',
   combo: 'shadow-xl shadow-orange-500/50',
 } as const;
 
@@ -33,11 +33,11 @@ export const RADIUS = {
 } as const;
 
 export const TYPE = {
-  hero: 'text-7xl md:text-8xl font-black leading-none tracking-normal',
-  display: 'text-5xl md:text-6xl font-black tracking-normal',
-  title: 'text-3xl md:text-4xl font-black tracking-normal',
+  hero: 'text-5xl md:text-6xl font-extrabold leading-tight tracking-normal',
+  display: 'text-4xl md:text-5xl font-extrabold tracking-normal',
+  title: 'text-3xl md:text-4xl font-extrabold tracking-normal',
   body: 'text-lg md:text-xl font-bold tracking-normal',
-  caption: 'text-sm font-black tracking-wide',
+  caption: 'text-base font-bold tracking-normal',
 } as const;
 
 export const SPACE = {
@@ -57,19 +57,19 @@ export const ELEV = {
 export const SCENE = {
   calm: 'from-emerald-100 via-teal-50 to-sky-100',
   focus: 'from-amber-50 via-lime-100 to-emerald-100',
-  celebrate: 'from-pink-200 via-amber-200 to-yellow-200',
-  challenge: 'from-indigo-200 via-violet-300 to-pink-300',
+  celebrate: 'from-[#FFECB0] via-[#FFD9C2] to-[#EAF9E6]',
+  challenge: 'from-[#EAF4FF] via-[#C2E0FF] to-[#EAF9E6]',
   night: 'from-slate-800 via-indigo-900 to-purple-950',
 } as const;
 
 export const SEMANTIC = {
-  correct: { bg: '#58CC02', ring: '#89E219', shadow: '#58CC02AA' },
-  wrong: { bg: '#FF4B4B', ring: '#FFA3A3', shadow: '#FF4B4B66' },
-  hint: { bg: '#FFC800', ring: '#FFDD66', shadow: '#FFC80066' },
-  primary: { bg: '#1CB0F6', ring: '#93DBFF', shadow: '#1CB0F655' },
+  correct: { bg: '#3EA02D', ring: '#C8EDBC', shadow: '#3EA02D66' },
+  wrong: { bg: '#F77444', ring: '#FFD9C2', shadow: '#F7744466' },
+  hint: { bg: '#FFB200', ring: '#FFECB0', shadow: '#FFB20066' },
+  primary: { bg: '#2E8CF0', ring: '#C2E0FF', shadow: '#2E8CF055' },
 } as const;
 
-export const CARD = 'bg-white/75 backdrop-blur-xl';
+export const CARD = 'bg-[#FFF9EF]/90 backdrop-blur-xl';
 
 export const TEXT_GRADIENT =
-  'bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500 bg-clip-text text-transparent';
+  'bg-gradient-to-r from-[#3EA02D] via-[#2E8CF0] to-[#FFB200] bg-clip-text text-transparent';

@@ -47,6 +47,8 @@ const EMPTY_PERIOD: LearningPeriodSummary = {
   accuracy: 0,
   avgTimeMs: 0,
 };
+const FOCUS_SKILL_LOOKBACK_DAYS = 28;
+const FOCUS_SKILL_HALF_LIFE_DAYS = 10;
 
 function localDayKey(date = new Date()) {
   const year = date.getFullYear();
@@ -67,6 +69,23 @@ function addDays(date: Date, days: number) {
   const copy = new Date(date);
   copy.setDate(copy.getDate() + days);
   return copy;
+}
+
+function daysBetween(left: Date, right: Date) {
+  const leftDay = new Date(left);
+  const rightDay = new Date(right);
+  leftDay.setHours(0, 0, 0, 0);
+  rightDay.setHours(0, 0, 0, 0);
+  return Math.round((leftDay.getTime() - rightDay.getTime()) / 86_400_000);
+}
+
+function dateFromDayKey(day: string) {
+  const [year, month, date] = day.split('-').map((part) => Number(part));
+  if (!year || !month || !date) {
+    return null;
+  }
+
+  return new Date(year, month - 1, date);
 }
 
 function readHistory(): LearningHistory {
@@ -197,10 +216,15 @@ export function createLearningHistorySummary(
     (day) => day.day >= previousWeekStartKey && day.day <= previousWeekEndKey,
   );
   const focusSkillCounts = new Map<string, number>();
+  const focusStartKey = localDayKey(addDays(now, -FOCUS_SKILL_LOOKBACK_DAYS + 1));
 
-  thisWeekDays.forEach((day) => {
+  history.days.filter((day) => day.day >= focusStartKey).forEach((day) => {
+    const dayDate = dateFromDayKey(day.day);
+    const ageDays = dayDate ? Math.max(daysBetween(now, dayDate), 0) : 0;
+    const decayWeight = 0.5 ** (ageDays / FOCUS_SKILL_HALF_LIFE_DAYS);
+
     Object.entries(day.focusSkillCounts).forEach(([key, count]) => {
-      focusSkillCounts.set(key, (focusSkillCounts.get(key) ?? 0) + count);
+      focusSkillCounts.set(key, (focusSkillCounts.get(key) ?? 0) + count * decayWeight);
     });
   });
 
@@ -216,6 +240,7 @@ export function createLearningHistorySummary(
     focusSkills: [...focusSkillCounts.entries()]
       .map(([key, count]) => ({ key, count }))
       .sort((left, right) => right.count - left.count)
+      .map(({ key, count }) => ({ key, count: Math.max(1, Math.round(count)) }))
       .slice(0, 5),
   };
 }

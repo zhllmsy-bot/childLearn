@@ -65,13 +65,6 @@ export function StickerAlbumPage({
       className="relative z-10 mx-auto w-full max-w-7xl pb-24"
     >
       <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/88 p-5 shadow-[0_24px_80px_rgba(15,118,110,0.14)] ring-1 ring-emerald-900/5 backdrop-blur-xl md:p-6">
-        <div className="pointer-events-none absolute -right-8 -top-10 text-[7rem] font-black tracking-normal text-sky-500 opacity-10">
-          M78
-        </div>
-        <div className="pointer-events-none absolute bottom-2 left-[48%] text-6xl text-rose-400 opacity-10">
-          ✦
-        </div>
-
         <div className="sticker-album-summary-grid relative grid gap-5">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -92,10 +85,10 @@ export function StickerAlbumPage({
             <div className="mt-5">
               <div className="flex items-center gap-2 text-sm font-black text-emerald-700/85">
                 <Sparkles size={18} strokeWidth={3} />
-                M78 收藏册
+                伙伴收藏册
               </div>
               <h1 className="mt-2 text-5xl font-black leading-none text-emerald-950 md:text-6xl">
-                奥特贴纸图鉴
+                贴纸图鉴
               </h1>
             </div>
 
@@ -159,7 +152,7 @@ export function StickerAlbumPage({
             ) : null}
           </div>
 
-          <aside className="flex min-w-0 flex-col justify-between gap-3 rounded-[1.5rem] bg-gradient-to-br from-sky-600 via-teal-500 to-rose-500 p-4 text-white shadow-xl shadow-sky-500/25">
+          <aside className="flex min-w-0 flex-col justify-between gap-3 rounded-[1.5rem] bg-gradient-to-br from-[#2E8CF0] to-[#3EA02D] p-4 text-white shadow-xl shadow-sky-500/25">
             {latestSticker ? (
               <motion.button
                 type="button"
@@ -221,20 +214,20 @@ export function StickerAlbumPage({
                   className="aspect-[4/3] w-full rounded-[1rem] shadow-md shadow-sky-200/50"
                   imageClassName="object-cover"
                 />
-	                <div className="mt-3 flex items-start justify-between gap-2">
-	                  <div className="min-w-0">
-	                    <div className="truncate text-xl font-black text-emerald-950">
-	                      {sticker.name}
-	                    </div>
-	                    <div className="mt-1 flex items-center gap-1.5 truncate text-sm font-black text-emerald-700/78">
-	                      <Zap size={15} fill="currentColor" strokeWidth={3} />
-	                      {sticker.signatureMove}
-	                    </div>
-	                    <div className="mt-1 text-xs font-black text-sky-700">
-	                      {getStickerMeta(sticker).rarityLabel} · {getStickerMeta(sticker).series}
-	                    </div>
-	                  </div>
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-100">
+                <div className="mt-3 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-xl font-black text-emerald-950">
+                      {sticker.name}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5 truncate text-base font-bold text-emerald-700/78">
+                      <Zap size={16} fill="currentColor" strokeWidth={3} />
+                      {sticker.signatureMove}
+                    </div>
+                    <div className="mt-1 text-base font-bold text-sky-700">
+                      {getStickerMeta(sticker).rarityLabel} · {getStickerMeta(sticker).series}
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-base font-bold text-emerald-800 ring-1 ring-emerald-100">
                     #{recentStickers.length - index}
                   </span>
                 </div>

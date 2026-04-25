@@ -260,6 +260,44 @@ export function useRewardGarden() {
     [today],
   );
 
+  const waterByStars = useCallback(
+    (stars: number) => {
+      const rewardWaterings = Number.isFinite(stars) ? Math.max(1, Math.round(stars)) : 1;
+      const previous = readStoredGarden();
+      const didWaterToday = previous.lastWateredDay !== today;
+      const nextStreak = didWaterToday
+        ? previous.lastWateredDay === previousDayKey()
+          ? previous.streak + 1
+          : 1
+        : previous.streak;
+      const nextWaterings = previous.totalWaterings + (didWaterToday ? rewardWaterings : 0);
+      const nextBadges = didWaterToday ? [BADGE_LIBRARY['daily-water']] : [];
+
+      if (didWaterToday && previous.totalWaterings === 0) {
+        nextBadges.push(BADGE_LIBRARY['first-level']);
+      }
+
+      const fruitCoins = rewardWaterings * 3;
+      const next: StoredGardenState = {
+        lastWateredDay: didWaterToday ? today : previous.lastWateredDay,
+        streak: nextStreak,
+        totalWaterings: nextWaterings,
+        fruitCoins: previous.fruitCoins + fruitCoins,
+        badges: Array.from(new Set([...previous.badges, ...nextBadges.map((badge) => badge.id)])),
+      };
+
+      writeStoredGarden(next);
+      setStoredGarden(next);
+      track('garden.reward.water_by_stars', {
+        stars: rewardWaterings,
+        didWaterToday,
+        streak: nextStreak,
+        fruitCoins,
+      });
+    },
+    [today],
+  );
+
   const garden = useMemo<GardenState>(
     () => ({
       ...storedGarden,
@@ -274,7 +312,8 @@ export function useRewardGarden() {
     () => ({
       garden,
       claimLevelCompletion,
+      waterByStars,
     }),
-    [claimLevelCompletion, garden],
+    [claimLevelCompletion, garden, waterByStars],
   );
 }

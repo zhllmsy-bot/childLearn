@@ -600,12 +600,12 @@ async function pushLearningStateSnapshot(reason: string) {
   }
 
   try {
-	    const response = await fetch(learningSyncUrl, {
-	      method: 'POST',
-	      headers: {
-	        'Content-Type': 'application/json',
-	        ...(CONFIGURED_SYNC_TOKEN ? { Authorization: `Bearer ${CONFIGURED_SYNC_TOKEN}` } : {}),
-	      },
+    const response = await fetch(learningSyncUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(CONFIGURED_SYNC_TOKEN ? { Authorization: `Bearer ${CONFIGURED_SYNC_TOKEN}` } : {}),
+      },
       body: JSON.stringify({ reason, state: envelope }),
       keepalive: true,
     });
@@ -695,12 +695,12 @@ export function useLearningStateSync() {
             changedKeyCount: changedKeys.length,
           });
 
-	          window.dispatchEvent(
-	            new CustomEvent('childlearn:learning-state-merged', {
-	              detail: { changedKeys },
-	            }),
-	          );
-	        }
+          window.dispatchEvent(
+            new CustomEvent('childlearn:learning-state-merged', {
+              detail: { changedKeys },
+            }),
+          );
+        }
 
         scheduleLearningStateSync('startup');
       })

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { Printer, X } from 'lucide-react';
+import { Printer, RotateCcw, X } from 'lucide-react';
 import { useMemo } from 'react';
 import { describeFactId } from '../../curriculum/factLabels';
 import type { ReviewItem } from '../../curriculum/reviewQueue';
@@ -18,6 +18,7 @@ import { StickerArtwork } from '../_primitives/StickerArtwork';
 interface ParentReportPanelProps {
   open: boolean;
   onClose: () => void;
+  onRestartDiagnostic: () => void;
   correct: number;
   attempted: number;
   maxCombo: number;
@@ -119,12 +120,12 @@ function AbilitySkillPill({ skill }: { skill: AbilitySkillAssessment }) {
       className={`rounded-2xl px-3 py-2 ring-1 ${ABILITY_STATUS_CLASS[skill.status]}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-black">{skill.label}</span>
-        <span className="shrink-0 text-xs font-black">
+        <span className="text-base font-black">{skill.label}</span>
+        <span className="shrink-0 text-base font-bold">
           {ABILITY_STATUS_LABELS[skill.status]}
         </span>
       </div>
-      <div className="mt-1 text-xs font-bold opacity-80">
+      <div className="mt-1 text-base font-bold opacity-80">
         {skill.category} · 首次 {Math.round(skill.firstTryAccuracy * 100)}% ·{' '}
         {skill.attempts} 题
       </div>
@@ -135,6 +136,7 @@ function AbilitySkillPill({ skill }: { skill: AbilitySkillAssessment }) {
 export function ParentReportPanel({
   open,
   onClose,
+  onRestartDiagnostic,
   correct,
   attempted,
   maxCombo,
@@ -174,16 +176,16 @@ export function ParentReportPanel({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 80 }}
           transition={SPRING.smooth}
-	          className="parent-report-panel fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-l-3xl bg-white/95 shadow-2xl shadow-emerald-500/30 ring-2 ring-white backdrop-blur-xl"
+          className="parent-report-panel fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-l-3xl bg-white/95 shadow-2xl shadow-emerald-500/30 ring-2 ring-white backdrop-blur-xl"
         >
           <div className="flex items-center justify-between gap-4 border-b-4 border-emerald-100 px-6 py-5">
             <div>
-	              <div className="text-sm font-bold text-emerald-700">
-	                {zhCN.parentReport.todayBrief}
-	              </div>
-	              <h2 className="text-4xl font-black text-emerald-950">
-	                {zhCN.parentReport.title}
-	              </h2>
+              <div className="text-sm font-bold text-emerald-700">
+                {zhCN.parentReport.todayBrief}
+              </div>
+              <h2 className="text-4xl font-black text-emerald-950">
+                {zhCN.parentReport.title}
+              </h2>
             </div>
             <div className="flex gap-2">
               <button
@@ -193,6 +195,14 @@ export function ParentReportPanel({
                 className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 text-sky-800 shadow-xl shadow-sky-500/10 ring-2 ring-white"
               >
                 <Printer size={24} strokeWidth={3.2} />
+              </button>
+              <button
+                type="button"
+                onClick={onRestartDiagnostic}
+                aria-label="重新评估学习起点"
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-800 shadow-xl shadow-amber-500/10 ring-2 ring-white"
+              >
+                <RotateCcw size={23} strokeWidth={3.2} />
               </button>
               <button
                 type="button"
@@ -261,7 +271,7 @@ export function ParentReportPanel({
                       {historySummary.focusSkills.map((skill) => (
                         <span
                           key={skill.key}
-                          className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-100"
+                          className="rounded-full bg-white px-3 py-1 text-base font-bold text-emerald-800 ring-1 ring-emerald-100"
                         >
                           {FOCUS_SKILL_LABELS[skill.key] ?? skill.key} ×{skill.count}
                         </span>
@@ -379,7 +389,7 @@ export function ParentReportPanel({
                           {abilityAssessment.observing.slice(0, 6).map((skill) => (
                             <span
                               key={skill.key}
-                              className="rounded-full bg-slate-50 px-3 py-1 text-xs font-black text-slate-700 ring-1 ring-slate-100"
+                              className="rounded-full bg-slate-50 px-3 py-1 text-base font-bold text-slate-700 ring-1 ring-slate-100"
                             >
                               {skill.label}
                             </span>
@@ -410,7 +420,7 @@ export function ParentReportPanel({
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-2xl font-black text-emerald-950">奥特贴纸图鉴</h3>
+              <h3 className="text-2xl font-black text-emerald-950">伙伴贴纸图鉴</h3>
               <div className="rounded-3xl bg-white p-4 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-100">
                 <div className="text-xl font-black text-emerald-950">
                   {stickers.length} / {stickerTotal}

@@ -1,6 +1,7 @@
 import { Home, Volume2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { SPRING } from '../../theme/springs';
+import { XiaomanSprite } from '../_primitives/XiaomanSprite';
 
 interface TopBarProps {
   combo: number;
@@ -31,7 +32,7 @@ export function TopBar({ combo, themeName, onHome, onSound }: TopBarProps) {
         className="safe-control-top-right safe-theme-pill fixed z-30 flex items-center gap-3 rounded-full bg-white px-5 py-2.5 text-base font-black text-emerald-950 shadow-xl shadow-emerald-500/20 ring-2 ring-white md:text-2xl"
       >
         <span className="shrink-0" aria-hidden="true">
-          🍎
+          <XiaomanSprite emotion="idle" className="h-8 w-8" alt="" />
         </span>
         <span className="min-w-0 truncate">{themeName}</span>
       </motion.div>
@@ -55,9 +56,9 @@ export function TopBar({ combo, themeName, onHome, onSound }: TopBarProps) {
           animate={{ scale: 1, x: 0 }}
           exit={{ scale: 0 }}
           transition={SPRING.bounce}
-          className="safe-control-top-right-stack fixed z-30 max-w-[calc(100vw-8rem)] whitespace-nowrap rounded-full bg-gradient-to-r from-orange-400 to-rose-500 px-4 py-2 text-base font-black text-white shadow-xl shadow-orange-500/50 ring-2 ring-white md:text-2xl"
+          className="safe-control-top-right-stack fixed z-30 max-w-[calc(100vw-8rem)] whitespace-nowrap rounded-full bg-[#FFECB0] px-4 py-2 text-base font-black text-[#183024] shadow-xl shadow-[#FFB200]/30 ring-2 ring-white md:text-2xl"
         >
-          🔥 {combo} COMBO
+          连对 {combo}
         </motion.div>
       ) : null}
     </>

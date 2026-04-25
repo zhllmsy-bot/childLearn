@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Xiaoman apple friend happy">
+  <rect width="240" height="240" rx="42" fill="#FFF9EF"/>
+  <ellipse cx="120" cy="214" rx="58" ry="12" fill="#183024" opacity=".10"/>
+  <path d="M128 48c18-25 36-24 52-12-7 23-29 32-52 12Z" fill="#7FC86A" stroke="#183024" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M119 58c7-18 7-29 1-40" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="5" stroke-linecap="round"/>
+  <path d="M58 114c0-43 28-70 62-70s62 27 62 70c0 50-29 84-62 84s-62-34-62-84Z" fill="#E24B3F" stroke="#183024" stroke-opacity=".8" stroke-width="6"/>
+  <path d="M91 116c9-9 20-9 29 0" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M121 116c9-9 20-9 29 0" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="82" cy="143" r="12" fill="#FFD9C2" opacity=".9"/>
+  <circle cx="158" cy="143" r="12" fill="#FFD9C2" opacity=".9"/>
+  <path d="M99 150c11 16 31 16 42 0" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M66 142c-24-8-34-24-29-43" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M174 142c24-8 34-24 29-43" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M93 196c-9 8-17 10-28 8" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M147 196c9 8 17 10 28 8" fill="none" stroke="#183024" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+</svg>
