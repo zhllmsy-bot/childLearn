@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { Printer, X } from 'lucide-react';
+import { useMemo } from 'react';
+import { describeFactId } from '../../curriculum/factLabels';
 import type { ReviewItem } from '../../curriculum/reviewQueue';
 import type {
   AbilityAssessment,
@@ -8,6 +10,8 @@ import type {
 } from '../../engagement/ability/abilityProfile';
 import type { Skin } from '../../engagement/skin/useSkinUnlock';
 import type { Sticker } from '../../engagement/collection/useStickers';
+import { createLearningHistorySummary } from '../../engagement/report/learningHistory';
+import { zhCN } from '../../i18n/zh-CN';
 import { SPRING } from '../../theme/springs';
 import { StickerArtwork } from '../_primitives/StickerArtwork';
 
@@ -84,6 +88,31 @@ const ABILITY_STATUS_CLASS: Record<AbilitySkillStatus, string> = {
   observing: 'bg-slate-50 text-slate-800 ring-slate-100',
 };
 
+const FOCUS_SKILL_LABELS: Record<string, string> = {
+  'operation:matching': '数量配对',
+  'operation:compare': '比较大小',
+  'operation:addition': '加法理解',
+  'operation:subtraction': '数轴距离',
+  'operation:mixed': '加减混合',
+  'presentation:visual': '图形题',
+  'presentation:semi_visual': '半图形半数字',
+  'presentation:pure_number': '纯数字题',
+  'presentation:story': '故事题',
+  'presentation:number_line': '数轴题',
+  'range:within_5': '5以内数量',
+  'range:within_10': '10以内数量',
+  'range:within_20': '20以内数量',
+  'range:within_30': '30以内数量',
+};
+
+function formatDelta(value: number, suffix = '') {
+  if (value > 0) {
+    return `+${value}${suffix}`;
+  }
+
+  return `${value}${suffix}`;
+}
+
 function AbilitySkillPill({ skill }: { skill: AbilitySkillAssessment }) {
   return (
     <div
@@ -125,6 +154,17 @@ export function ParentReportPanel({
 }: ParentReportPanelProps) {
   const accuracy = attempted === 0 ? 100 : Math.round((correct / attempted) * 100);
   const unlockedSkins = skins.filter((skin) => skin.unlocked);
+  const historySummary = useMemo(
+    () => (open ? createLearningHistorySummary() : null),
+    [open],
+  );
+  const suggestedMinutes =
+    historySummary && historySummary.today.attempted >= 12
+      ? '今天已经够了，明天 8 分钟轻复习'
+      : '建议今天 8-12 分钟，优先做巩固包';
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <AnimatePresence>
@@ -134,21 +174,35 @@ export function ParentReportPanel({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 80 }}
           transition={SPRING.smooth}
-          className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-l-3xl bg-white/95 shadow-2xl shadow-emerald-500/30 ring-2 ring-white backdrop-blur-xl"
+	          className="parent-report-panel fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-l-3xl bg-white/95 shadow-2xl shadow-emerald-500/30 ring-2 ring-white backdrop-blur-xl"
         >
           <div className="flex items-center justify-between gap-4 border-b-4 border-emerald-100 px-6 py-5">
             <div>
-              <div className="text-sm font-bold text-emerald-700">今日简报</div>
-              <h2 className="text-4xl font-black text-emerald-950">数感报告</h2>
+	              <div className="text-sm font-bold text-emerald-700">
+	                {zhCN.parentReport.todayBrief}
+	              </div>
+	              <h2 className="text-4xl font-black text-emerald-950">
+	                {zhCN.parentReport.title}
+	              </h2>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="关闭家长报告"
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-800 shadow-xl shadow-emerald-500/20 ring-2 ring-white"
-            >
-              <X size={28} strokeWidth={3.2} />
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handlePrint}
+                aria-label={zhCN.parentReport.printLabel}
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 text-sky-800 shadow-xl shadow-sky-500/10 ring-2 ring-white"
+              >
+                <Printer size={24} strokeWidth={3.2} />
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="关闭家长报告"
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-800 shadow-xl shadow-emerald-500/20 ring-2 ring-white"
+              >
+                <X size={28} strokeWidth={3.2} />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
@@ -172,6 +226,51 @@ export function ParentReportPanel({
                 <div className="text-3xl font-black text-sky-950">{difficulty}</div>
               </div>
             </section>
+
+            {historySummary ? (
+              <section className="space-y-3">
+                <h3 className="text-2xl font-black text-emerald-950">
+                  {zhCN.parentReport.weeklyProgress}
+                </h3>
+                <div className="rounded-3xl bg-white p-4 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-100">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-emerald-50 p-3 ring-1 ring-emerald-100">
+                      <div className="text-sm font-bold text-emerald-700">本周完成</div>
+                      <div className="text-2xl font-black text-emerald-950">
+                        {historySummary.thisWeek.attempted} 题
+                      </div>
+                      <div className="text-sm font-black text-emerald-700/75">
+                        {formatDelta(historySummary.weeklyAttemptDelta, ' 题')} vs 上周
+                      </div>
+                    </div>
+                    <div className="rounded-2xl bg-sky-50 p-3 ring-1 ring-sky-100">
+                      <div className="text-sm font-bold text-sky-700">本周正确率</div>
+                      <div className="text-2xl font-black text-sky-950">
+                        {historySummary.thisWeek.accuracy}%
+                      </div>
+                      <div className="text-sm font-black text-sky-700/75">
+                        {formatDelta(historySummary.weeklyAccuracyDelta, '%')} vs 上周
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-sm font-black leading-relaxed text-amber-900 ring-1 ring-amber-100">
+                    {suggestedMinutes}
+                  </div>
+                  {historySummary.focusSkills.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {historySummary.focusSkills.map((skill) => (
+                        <span
+                          key={skill.key}
+                          className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-100"
+                        >
+                          {FOCUS_SKILL_LABELS[skill.key] ?? skill.key} ×{skill.count}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
 
             {flowState || flowAction ? (
               <section className="space-y-3">
@@ -340,7 +439,7 @@ export function ParentReportPanel({
                         key={item.factId}
                         className="rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-900"
                       >
-                        {item.factId}
+                        {describeFactId(item.factId)}
                       </span>
                     ))}
                   </div>

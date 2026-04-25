@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { memo } from 'react';
 
 interface ComboBannerProps {
   combo: number;
@@ -36,7 +37,7 @@ function getComboConfig(combo: number) {
   };
 }
 
-export function ComboBanner({ combo }: ComboBannerProps) {
+function ComboBannerComponent({ combo }: ComboBannerProps) {
   const shouldShow = combo >= 3;
   const cfg = getComboConfig(combo);
 
@@ -66,3 +67,5 @@ export function ComboBanner({ combo }: ComboBannerProps) {
     </AnimatePresence>
   );
 }
+
+export const ComboBanner = memo(ComboBannerComponent);

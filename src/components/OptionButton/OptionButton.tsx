@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { memo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import type { QuestionOption } from '../../curriculum/types';
 import { SPRING } from '../../theme/springs';
 
@@ -34,13 +35,14 @@ const stateClass: Record<Exclude<OptionVisualState, 'idle'>, string> = {
   hint: 'bg-gradient-to-br from-yellow-300 to-amber-400 text-white shadow-amber-400/60 ring-white',
 };
 
-export function OptionButton({
+function OptionButtonComponent({
   option,
   state,
   paletteIndex = 0,
   visualEmoji = '✦',
   onSelect,
 }: OptionButtonProps) {
+  const reduceMotion = useReducedMotion();
   const disabled = state === 'disabled';
   const isIdle = state === 'idle' || state === 'hint';
   const visualClass =
@@ -52,10 +54,12 @@ export function OptionButton({
     <motion.button
       type="button"
       layout
-      whileHover={isIdle ? { scale: 1.08, y: -6 } : undefined}
-      whileTap={isIdle ? { scale: 0.92 } : undefined}
+      whileHover={isIdle && !reduceMotion ? { scale: 1.08, y: -6 } : undefined}
+      whileTap={isIdle && !reduceMotion ? { scale: 0.92 } : undefined}
       animate={
-        state === 'wrong'
+        reduceMotion
+          ? { x: 0, scale: 1, rotate: 0 }
+          : state === 'wrong'
           ? { x: [-12, 12, -12, 12, 0] }
           : state === 'correct'
             ? { scale: [1, 1.18, 1], rotate: [0, -3, 2, 0] }
@@ -64,8 +68,15 @@ export function OptionButton({
       transition={state === 'correct' ? SPRING.celebrate : SPRING.bounce}
       disabled={disabled}
       onClick={() => onSelect(option)}
-      className={`ipad-option-button relative flex h-32 flex-col items-center justify-center gap-1 rounded-3xl px-8 py-5 shadow-xl ring-2 md:h-44 ${visualClass}`}
+      aria-label={`选择答案 ${option.label}${state === 'hint' ? '，接近正确答案' : ''}`}
+      aria-pressed={state === 'correct'}
+      className={`ipad-option-button relative flex h-32 flex-col items-center justify-center gap-1 rounded-3xl px-8 py-5 shadow-xl ring-2 outline-none focus-visible:ring-4 focus-visible:ring-emerald-900 md:h-44 ${visualClass}`}
     >
+      {state === 'hint' ? (
+        <span className="absolute right-3 top-3 rounded-full bg-white/88 px-2 py-1 text-xs font-black text-amber-800 shadow-sm ring-1 ring-amber-100">
+          接近
+        </span>
+      ) : null}
       <span className="text-2xl drop-shadow-md" aria-hidden="true">
         {visualEmoji}
       </span>
@@ -75,3 +86,5 @@ export function OptionButton({
     </motion.button>
   );
 }
+
+export const OptionButton = memo(OptionButtonComponent);

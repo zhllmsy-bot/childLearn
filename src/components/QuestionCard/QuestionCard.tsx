@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { memo } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import type { Question } from '../../curriculum/types';
 import { SPRING } from '../../theme/springs';
 import { CARD, SHADOW, TEXT_GRADIENT } from '../../theme/tokens';
@@ -375,26 +376,29 @@ function LearningRepresentation({ question }: { question: Question }) {
   return <BarModelView question={question} />;
 }
 
-export function QuestionCard({ question, answered }: QuestionCardProps) {
+function QuestionCardComponent({ question, answered }: QuestionCardProps) {
+  const reduceMotion = useReducedMotion();
+  const shouldCelebrate = answered && !reduceMotion;
+
   return (
     <motion.div
       key={question.id}
-      initial={{ opacity: 0, scale: 0.86, y: 32 }}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.86, y: 32 }}
       animate={
-        answered
+        shouldCelebrate
           ? {
               opacity: 1,
               ...CARD_SUCCESS_MOTION,
             }
           : { opacity: 1, scale: 1, x: 0, y: 0, rotate: 0 }
       }
-      transition={answered ? CARD_SUCCESS_TIMING : SPRING.enter}
+      transition={shouldCelebrate ? CARD_SUCCESS_TIMING : SPRING.enter}
       className="ipad-question-card relative mx-auto w-full max-w-4xl"
     >
-      {answered ? <CardShatterBurst /> : null}
+      {shouldCelebrate ? <CardShatterBurst /> : null}
       <motion.div
-        animate={answered ? CARD_BODY_SUCCESS_MOTION : { opacity: 1, scale: 1 }}
-        transition={answered ? CARD_SUCCESS_TIMING : SPRING.enter}
+        animate={shouldCelebrate ? CARD_BODY_SUCCESS_MOTION : { opacity: 1, scale: 1 }}
+        transition={shouldCelebrate ? CARD_SUCCESS_TIMING : SPRING.enter}
         className={`${CARD} ${SHADOW.mint} flex w-full flex-col items-center gap-5 rounded-3xl p-5 text-center ring-2 ring-white md:gap-6 md:p-8`}
       >
         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -421,3 +425,5 @@ export function QuestionCard({ question, answered }: QuestionCardProps) {
     </motion.div>
   );
 }
+
+export const QuestionCard = memo(QuestionCardComponent);

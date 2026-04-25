@@ -7,6 +7,7 @@ const CONFIGURED_TTS_URL =
   import.meta.env.VITE_TTS_URL?.trim() ||
   import.meta.env.VITE_EDGE_TTS_URL?.trim() ||
   '';
+const CONFIGURED_TTS_PROVIDER = import.meta.env.VITE_TTS_PROVIDER?.trim();
 const DEFAULT_VOICE = 'zh-CN-XiaoxiaoNeural';
 const DEFAULT_VOLUME = '+0%';
 const DEFAULT_PITCH = '-2Hz';
@@ -21,6 +22,7 @@ const FALLBACK_PLAYBACK_GUARD_MS = 30000;
 const PLAYBACK_END_GRACE_MS = 1800;
 const AUDIO_TAIL_FADE_MS = 620;
 const AUDIO_FADE_INTERVAL_MS = 40;
+const MAX_AUDIO_CACHE_ITEMS = 40;
 
 function getRuntimeTtsUrl() {
   return resolveRuntimeUrl(CONFIGURED_TTS_URL);
@@ -30,6 +32,14 @@ function getRemoteTtsProvider(ttsUrl: string): Exclude<
   VoicePlaybackResult['provider'],
   'browser-speech' | 'none'
 > {
+  if (
+    CONFIGURED_TTS_PROVIDER === 'edge-tts' ||
+    CONFIGURED_TTS_PROVIDER === 'indextts2' ||
+    CONFIGURED_TTS_PROVIDER === 'volcengine'
+  ) {
+    return CONFIGURED_TTS_PROVIDER;
+  }
+
   return ttsUrl.toLowerCase().includes('volcengine') ||
     ttsUrl.includes(':8791/') ||
     ttsUrl.includes(':8793/')
@@ -58,6 +68,11 @@ interface ActiveWebAudioPlayback {
   stop: () => void;
 }
 
+interface CachedAudioData {
+  contentType: string;
+  audioData: ArrayBuffer;
+}
+
 type WebAudioWindow = Window & {
   webkitAudioContext?: typeof AudioContext;
 };
@@ -66,6 +81,7 @@ const STOPPED_RESULT: VoicePlaybackResult = {
   provider: 'none',
   status: 'stopped',
 };
+const audioDataCache = new Map<string, CachedAudioData>();
 
 function createFinishedResult(
   provider: VoicePlaybackResult['provider'],
@@ -81,6 +97,53 @@ function createUnavailableResult(): VoicePlaybackResult {
     provider: 'none',
     status: 'unavailable',
   };
+}
+
+function createAudioCacheKey({
+  provider,
+  text,
+  voice,
+  rate,
+  volume,
+  pitch,
+}: {
+  provider: VoicePlaybackResult['provider'];
+  text: string;
+  voice: string;
+  rate?: string;
+  volume: string;
+  pitch: string;
+}) {
+  return JSON.stringify({ provider, text, voice, rate, volume, pitch });
+}
+
+function readCachedAudioData(key: string) {
+  const cached = audioDataCache.get(key);
+  if (!cached) {
+    return null;
+  }
+
+  audioDataCache.delete(key);
+  audioDataCache.set(key, cached);
+  return {
+    ...cached,
+    audioData: cached.audioData.slice(0),
+  };
+}
+
+function writeCachedAudioData(key: string, value: CachedAudioData) {
+  audioDataCache.set(key, {
+    contentType: value.contentType,
+    audioData: value.audioData.slice(0),
+  });
+
+  while (audioDataCache.size > MAX_AUDIO_CACHE_ITEMS) {
+    const oldestKey = audioDataCache.keys().next().value;
+    if (!oldestKey) {
+      return;
+    }
+    audioDataCache.delete(oldestKey);
+  }
 }
 
 function estimatePlaybackWaitMs(text: string) {
@@ -623,37 +686,56 @@ export function useVoicePlayer(onUnavailable?: (message: string) => void) {
           onUnavailable?.('当前浏览器不支持语音播放');
         }
         return fallbackResult ?? createUnavailableResult();
-      }
+	      }
 
-      const remoteTtsProvider = getRemoteTtsProvider(ttsUrl);
-      let requestTimedOut = false;
-      const timeoutId = window.setTimeout(() => {
-        requestTimedOut = true;
-        controller.abort();
-      }, REQUEST_TIMEOUT_MS);
+	      const remoteTtsProvider = getRemoteTtsProvider(ttsUrl);
+	      const voice = line.voice ?? DEFAULT_VOICE;
+	      const volume = line.volume ?? DEFAULT_VOLUME;
+	      const pitch = line.pitch ?? DEFAULT_PITCH;
+	      const cacheKey = createAudioCacheKey({
+	        provider: remoteTtsProvider,
+	        text,
+	        voice,
+	        rate: line.rate,
+	        volume,
+	        pitch,
+	      });
+	      let requestTimedOut = false;
+	      const timeoutId = window.setTimeout(() => {
+	        requestTimedOut = true;
+	        controller.abort();
+	      }, REQUEST_TIMEOUT_MS);
 
-      try {
-        const response = await fetch(ttsUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text,
-            voice: line.voice ?? DEFAULT_VOICE,
-            rate: line.rate,
-            volume: line.volume ?? DEFAULT_VOLUME,
-            pitch: line.pitch ?? DEFAULT_PITCH,
-          }),
-          signal: controller.signal,
-        });
+	      try {
+	        const cachedAudio = readCachedAudioData(cacheKey);
+	        let contentType = cachedAudio?.contentType ?? 'audio/mpeg';
+	        let audioData = cachedAudio?.audioData ?? null;
 
-        if (!response.ok) {
-          throw new Error(`TTS failed: ${response.status}`);
-        }
+	        if (!audioData) {
+	          const response = await fetch(ttsUrl, {
+	            method: 'POST',
+	            headers: {
+	              'Content-Type': 'application/json',
+	            },
+	            body: JSON.stringify({
+	              text,
+	              voice,
+	              rate: line.rate,
+	              volume,
+	              pitch,
+	            }),
+	            signal: controller.signal,
+	          });
 
-	        const contentType = response.headers.get('content-type') ?? 'audio/mpeg';
-	        const audioData = await response.arrayBuffer();
+	          if (!response.ok) {
+	            throw new Error(`TTS failed: ${response.status}`);
+	          }
+
+	          contentType = response.headers.get('content-type') ?? 'audio/mpeg';
+	          audioData = await response.arrayBuffer();
+	          writeCachedAudioData(cacheKey, { contentType, audioData });
+	        }
+
 	        const webAudioPlayback = await playWithWebAudio(
 	          audioData,
 	          text,
@@ -663,7 +745,7 @@ export function useVoicePlayer(onUnavailable?: (message: string) => void) {
 	          track('voice.play', {
 	            provider: remoteTtsProvider,
 	            moment: line.moment,
-	            output: 'web-audio',
+	            output: cachedAudio ? 'web-audio-cache' : 'web-audio',
 	          });
 	          return await webAudioPlayback;
 	        }

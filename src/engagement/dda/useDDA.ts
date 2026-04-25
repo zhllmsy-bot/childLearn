@@ -72,6 +72,11 @@ export function useDDA() {
     return next;
   }, []);
 
+  const applyDiagnosticResult = useCallback(
+    (difficulty: number) => applyDifficulty(difficulty),
+    [applyDifficulty],
+  );
+
   const record = useCallback((outcome: DdaOutcome) => {
     const predicted = nextDdaState(state, outcome);
     setState((previous) => {
@@ -96,10 +101,12 @@ export function useDDA() {
       onCorrect: () => record('correct'),
       onWrong: () => record('wrong'),
       applyDifficulty,
+      applyDiagnosticResult,
       reset,
     }),
     [
       applyDifficulty,
+      applyDiagnosticResult,
       record,
       reset,
       state.consecutiveCorrect,

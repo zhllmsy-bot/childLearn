@@ -1,0 +1,18 @@
+{
+  "name": "childLearn 数感练习",
+  "short_name": "childLearn",
+  "description": "儿童数感练习、复习包和家长报告",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#bbf7d0",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

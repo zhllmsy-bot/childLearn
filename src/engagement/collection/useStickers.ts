@@ -14,10 +14,41 @@ export interface Sticker {
   voiceLine: string;
   group: string;
   accent: string;
+  rarity?: StickerRarity;
+  series?: string;
 }
 
 const STORAGE_KEY = 'childlearn.m78-stickers';
+const PROGRESS_STORAGE_KEY = 'childlearn.m78-sticker-progress-v2';
 export const STICKER_UNLOCK_COMBO_INTERVAL = 4;
+export type StickerRarity = 'common' | 'rare' | 'epic' | 'legendary';
+
+export interface StickerSeriesProgress {
+  series: string;
+  collected: number;
+  total: number;
+}
+
+interface StickerProgressState {
+  schemaVersion: 2;
+  collectedIds: string[];
+  pityCounter: number;
+  duplicateShards: number;
+}
+
+const INITIAL_PROGRESS: StickerProgressState = {
+  schemaVersion: 2,
+  collectedIds: [],
+  pityCounter: 0,
+  duplicateShards: 0,
+};
+
+const RARITY_LABELS: Record<StickerRarity, string> = {
+  common: '普通',
+  rare: '稀有',
+  epic: '史诗',
+  legendary: '传说',
+};
 
 export function shouldOfferStickerUnlock({
   combo,
@@ -230,12 +261,145 @@ const LEGACY_STICKER_LIBRARY: Sticker[] = [
 
 export const STICKER_LIBRARY = ultraStickerCatalog as Sticker[];
 
+function rarityForIndex(index: number): StickerRarity {
+  if (index % 31 === 0) {
+    return 'legendary';
+  }
+
+  if (index % 11 === 0) {
+    return 'epic';
+  }
+
+  if (index % 4 === 0) {
+    return 'rare';
+  }
+
+  return 'common';
+}
+
+export function getStickerMeta(sticker: Sticker) {
+  const index = STICKER_LIBRARY.findIndex((item) => item.id === sticker.id);
+  const rarity = sticker.rarity ?? rarityForIndex(Math.max(index, 0));
+  const series = sticker.series ?? sticker.group;
+
+  return {
+    rarity,
+    rarityLabel: RARITY_LABELS[rarity],
+    series,
+  };
+}
+
+function hydrateStickerMeta(sticker: Sticker): Sticker {
+  const meta = getStickerMeta(sticker);
+  return {
+    ...sticker,
+    rarity: meta.rarity,
+    series: meta.series,
+  };
+}
+
 export function findStickerById(id: string | null | undefined) {
   if (!id) {
     return null;
   }
 
-  return STICKER_LIBRARY.find((sticker) => sticker.id === id) ?? null;
+  const sticker = STICKER_LIBRARY.find((item) => item.id === id) ?? null;
+  return sticker ? hydrateStickerMeta(sticker) : null;
+}
+
+function readStoredStickerProgress(): StickerProgressState {
+  if (typeof window === 'undefined') {
+    return INITIAL_PROGRESS;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(PROGRESS_STORAGE_KEY) ?? 'null',
+    ) as Partial<StickerProgressState> | null;
+
+    if (parsed?.schemaVersion === 2 && Array.isArray(parsed.collectedIds)) {
+      return {
+        schemaVersion: 2,
+        collectedIds: parsed.collectedIds.filter((id) => typeof id === 'string'),
+        pityCounter: Math.max(0, Math.round(Number(parsed.pityCounter ?? 0))),
+        duplicateShards: Math.max(0, Math.round(Number(parsed.duplicateShards ?? 0))),
+      };
+    }
+  } catch {
+    // Fall through to legacy migration.
+  }
+
+  return {
+    ...INITIAL_PROGRESS,
+    collectedIds: [...readStoredStickerIds()],
+  };
+}
+
+function writeStoredStickerProgress(state: StickerProgressState) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(state));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.collectedIds));
+  scheduleLearningStateSync('stickers');
+}
+
+function pickRarity(seed: number, pityCounter: number): StickerRarity {
+  if (pityCounter >= 7) {
+    return 'epic';
+  }
+
+  const roll = Math.abs(Math.round(seed * 9973)) % 100;
+  if (roll >= 99) {
+    return 'legendary';
+  }
+
+  if (roll >= 92) {
+    return 'epic';
+  }
+
+  if (roll >= 70) {
+    return 'rare';
+  }
+
+  return 'common';
+}
+
+function findCollectibleSticker(seed: number, collectedIds: Set<string>, rarity: StickerRarity) {
+  const missing = STICKER_LIBRARY.map(hydrateStickerMeta).filter(
+    (sticker) => !collectedIds.has(sticker.id),
+  );
+  const matching = missing.filter((sticker) => getStickerMeta(sticker).rarity === rarity);
+  const candidates = matching.length > 0 ? matching : missing;
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates[Math.abs(Math.round(seed)) % candidates.length];
+}
+
+function createSeriesProgress(collectedIds: Set<string>): StickerSeriesProgress[] {
+  const bySeries = new Map<string, StickerSeriesProgress>();
+
+  STICKER_LIBRARY.map(hydrateStickerMeta).forEach((sticker) => {
+    const series = getStickerMeta(sticker).series;
+    const previous = bySeries.get(series) ?? { series, collected: 0, total: 0 };
+    bySeries.set(series, {
+      series,
+      total: previous.total + 1,
+      collected: previous.collected + (collectedIds.has(sticker.id) ? 1 : 0),
+    });
+  });
+
+  return [...bySeries.values()].sort((left, right) => {
+    if (right.collected !== left.collected) {
+      return right.collected - left.collected;
+    }
+
+    return left.series.localeCompare(right.series);
+  });
 }
 
 function readStoredStickerIds() {
@@ -261,57 +425,94 @@ function writeStoredStickerIds(ids: Set<string>) {
 }
 
 export function useStickers() {
-  const [collectedIds, setCollectedIds] = useState<Set<string>>(readStoredStickerIds);
+  const [progress, setProgress] = useState<StickerProgressState>(
+    readStoredStickerProgress,
+  );
+  const collectedIdSet = useMemo(
+    () => new Set(progress.collectedIds),
+    [progress.collectedIds],
+  );
 
   const collectBySeed = useCallback((seed: number) => {
-    const sticker = STICKER_LIBRARY[seed % STICKER_LIBRARY.length];
-    const didCollect = !collectedIds.has(sticker.id);
+    const collectedIds = new Set(progress.collectedIds);
+    const rarity = pickRarity(seed, progress.pityCounter);
+    const sticker = findCollectibleSticker(seed, collectedIds, rarity);
 
-    if (!didCollect) {
+    if (!sticker) {
+      const fallbackSticker = STICKER_LIBRARY[Math.abs(seed) % STICKER_LIBRARY.length];
       track('sticker.collect_skipped', {
-        stickerId: sticker.id,
-        reason: 'duplicate',
+        stickerId: fallbackSticker.id,
+        reason: 'complete_or_duplicate',
+      });
+      setProgress((previous) => {
+        const next = {
+          ...previous,
+          duplicateShards: previous.duplicateShards + 1,
+        };
+        writeStoredStickerProgress(next);
+        return next;
       });
       return null;
     }
 
-    setCollectedIds((previous) => {
-      if (previous.has(sticker.id)) {
+    setProgress((previous) => {
+      if (previous.collectedIds.includes(sticker.id)) {
         return previous;
       }
 
-      const next = new Set(previous);
-      next.add(sticker.id);
-      writeStoredStickerIds(next);
+      const next: StickerProgressState = {
+        schemaVersion: 2,
+        collectedIds: [...previous.collectedIds, sticker.id],
+        pityCounter: getStickerMeta(sticker).rarity === 'common' ? previous.pityCounter + 1 : 0,
+        duplicateShards: previous.duplicateShards,
+      };
+      writeStoredStickerProgress(next);
       track('sticker.collect', {
         stickerId: sticker.id,
-        totalCollected: next.size,
+        rarity: getStickerMeta(sticker).rarity,
+        series: getStickerMeta(sticker).series,
+        totalCollected: next.collectedIds.length,
       });
       return next;
     });
     return sticker;
-  }, [collectedIds]);
+  }, [progress.collectedIds, progress.pityCounter]);
 
   const reset = useCallback(() => {
-    writeStoredStickerIds(new Set());
-    setCollectedIds(new Set());
+    writeStoredStickerProgress(INITIAL_PROGRESS);
+    setProgress(INITIAL_PROGRESS);
   }, []);
 
   const collected = useMemo(
     () =>
-      [...collectedIds]
+      progress.collectedIds
         .map((id) => findStickerById(id))
         .filter((sticker): sticker is Sticker => Boolean(sticker)),
-    [collectedIds],
+    [progress.collectedIds],
+  );
+
+  const seriesProgress = useMemo(
+    () => createSeriesProgress(collectedIdSet),
+    [collectedIdSet],
   );
 
   return useMemo(
     () => ({
       collected,
       total: STICKER_LIBRARY.length,
+      duplicateShards: progress.duplicateShards,
+      pityCounter: progress.pityCounter,
+      seriesProgress,
       collectBySeed,
       reset,
     }),
-    [collectBySeed, collected, reset],
+    [
+      collectBySeed,
+      collected,
+      progress.duplicateShards,
+      progress.pityCounter,
+      reset,
+      seriesProgress,
+    ],
   );
 }

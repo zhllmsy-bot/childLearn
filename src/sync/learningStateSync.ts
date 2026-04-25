@@ -15,8 +15,11 @@ export const LEARNING_STORAGE_KEYS = [
   'childlearn.reward-garden',
   'childlearn.daily-first-win',
   'childlearn.m78-stickers',
+  'childlearn.m78-sticker-progress-v2',
   'childlearn.ability-profile-v1',
   'childlearn.programming-progress-v1',
+  'childlearn.diagnostic-v1',
+  'childlearn.learning-history-v1',
 ] as const;
 
 type LearningStorageKey = (typeof LEARNING_STORAGE_KEYS)[number];
@@ -46,8 +49,8 @@ const LEARNING_SYNC_URL = import.meta.env.VITE_LEARNING_SYNC_URL?.trim();
 const CONFIGURED_CHILD_ID = import.meta.env.VITE_LEARNING_CHILD_ID?.trim();
 const CHILD_ID_STORAGE_KEY = 'childlearn.child-id';
 const DEVICE_ID_STORAGE_KEY = 'childlearn.device-id';
-const RELOAD_MARKER_KEY = 'childlearn.learning-sync-reloaded';
 const PUSH_DEBOUNCE_MS = 800;
+const CONFIGURED_SYNC_TOKEN = import.meta.env.VITE_LEARNING_SYNC_TOKEN?.trim();
 
 let pushTimer: number | undefined;
 let pendingReason = 'unknown';
@@ -213,6 +216,40 @@ function mergeStickerIds(localValue: string | undefined, remoteValue: string | u
   return JSON.stringify([...merged]);
 }
 
+function mergeStickerProgress(localValue: string | undefined, remoteValue: string | undefined) {
+  const local = parseJson(localValue);
+  const remote = parseJson(remoteValue);
+  const ids = new Set<string>();
+
+  [local, remote].forEach((value) => {
+    if (!isPlainRecord(value) || !Array.isArray(value.collectedIds)) {
+      return;
+    }
+
+    value.collectedIds.forEach((id) => {
+      if (typeof id === 'string') {
+        ids.add(id);
+      }
+    });
+  });
+
+  const localRecord = isPlainRecord(local) ? local : {};
+  const remoteRecord = isPlainRecord(remote) ? remote : {};
+
+  return JSON.stringify({
+    schemaVersion: 2,
+    collectedIds: [...ids],
+    pityCounter: Math.max(
+      finiteNumber(localRecord.pityCounter),
+      finiteNumber(remoteRecord.pityCounter),
+    ),
+    duplicateShards: Math.max(
+      finiteNumber(localRecord.duplicateShards),
+      finiteNumber(remoteRecord.duplicateShards),
+    ),
+  });
+}
+
 function mergeGarden(localValue: string | undefined, remoteValue: string | undefined) {
   const local = parseJson(localValue);
   const remote = parseJson(remoteValue);
@@ -256,6 +293,11 @@ function mergeGarden(localValue: string | undefined, remoteValue: string | undef
 function appSnapshotUpdatedAt(value: string | undefined) {
   const parsed = parseJson(value);
   return isPlainRecord(parsed) ? finiteNumber(parsed.updatedAt) : 0;
+}
+
+function diagnosticCompletedAt(value: string | undefined) {
+  const parsed = parseJson(value);
+  return isPlainRecord(parsed) ? finiteNumber(parsed.completedAt) : 0;
 }
 
 function mergeAbilityProfile(localValue: string | undefined, remoteValue: string | undefined) {
@@ -369,6 +411,60 @@ function mergeProgrammingProgress(
   });
 }
 
+function mergeLearningHistory(localValue: string | undefined, remoteValue: string | undefined) {
+  const local = parseJson(localValue);
+  const remote = parseJson(remoteValue);
+  const byDay = new Map<string, Record<string, unknown>>();
+
+  [local, remote].forEach((value) => {
+    if (!isPlainRecord(value) || !Array.isArray(value.days)) {
+      return;
+    }
+
+    value.days.forEach((entry) => {
+      if (!isPlainRecord(entry) || typeof entry.day !== 'string') {
+        return;
+      }
+
+      const previous = byDay.get(entry.day) ?? {};
+      const focusSkillCounts = {
+        ...(isPlainRecord(previous.focusSkillCounts) ? previous.focusSkillCounts : {}),
+      } as Record<string, number>;
+      const incomingFocus = isPlainRecord(entry.focusSkillCounts)
+        ? entry.focusSkillCounts
+        : {};
+
+      Object.entries(incomingFocus).forEach(([key, count]) => {
+        focusSkillCounts[key] = Math.max(
+          Number(focusSkillCounts[key] ?? 0),
+          finiteNumber(count),
+        );
+      });
+
+      byDay.set(entry.day, {
+        day: entry.day,
+        attempted: Math.max(finiteNumber(previous.attempted), finiteNumber(entry.attempted)),
+        correct: Math.max(finiteNumber(previous.correct), finiteNumber(entry.correct)),
+        firstTryCorrect: Math.max(
+          finiteNumber(previous.firstTryCorrect),
+          finiteNumber(entry.firstTryCorrect),
+        ),
+        hintsUsed: Math.max(finiteNumber(previous.hintsUsed), finiteNumber(entry.hintsUsed)),
+        totalTimeMs: Math.max(finiteNumber(previous.totalTimeMs), finiteNumber(entry.totalTimeMs)),
+        focusSkillCounts,
+        updatedAt: Math.max(finiteNumber(previous.updatedAt), finiteNumber(entry.updatedAt)),
+      });
+    });
+  });
+
+  return JSON.stringify({
+    schemaVersion: 1,
+    days: [...byDay.values()]
+      .sort((left, right) => String(left.day).localeCompare(String(right.day)))
+      .slice(-90),
+  });
+}
+
 function mergeValue(
   key: LearningStorageKey,
   localValue: string | undefined,
@@ -404,10 +500,18 @@ function mergeValue(
       return [localValue, remoteValue].sort()[1];
     case 'childlearn.m78-stickers':
       return mergeStickerIds(localValue, remoteValue);
+    case 'childlearn.m78-sticker-progress-v2':
+      return mergeStickerProgress(localValue, remoteValue);
     case 'childlearn.ability-profile-v1':
       return mergeAbilityProfile(localValue, remoteValue);
     case 'childlearn.programming-progress-v1':
       return mergeProgrammingProgress(localValue, remoteValue);
+    case 'childlearn.diagnostic-v1':
+      return diagnosticCompletedAt(remoteValue) >= diagnosticCompletedAt(localValue)
+        ? remoteValue
+        : localValue;
+    case 'childlearn.learning-history-v1':
+      return mergeLearningHistory(localValue, remoteValue);
     case 'childlearn.app-state-v1':
       return appSnapshotUpdatedAt(remoteValue) >= appSnapshotUpdatedAt(localValue)
         ? remoteValue
@@ -496,11 +600,12 @@ async function pushLearningStateSnapshot(reason: string) {
   }
 
   try {
-    const response = await fetch(learningSyncUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+	    const response = await fetch(learningSyncUrl, {
+	      method: 'POST',
+	      headers: {
+	        'Content-Type': 'application/json',
+	        ...(CONFIGURED_SYNC_TOKEN ? { Authorization: `Bearer ${CONFIGURED_SYNC_TOKEN}` } : {}),
+	      },
       body: JSON.stringify({ reason, state: envelope }),
       keepalive: true,
     });
@@ -550,7 +655,11 @@ async function pullLearningStateSnapshot() {
   }
 
   const childId = encodeURIComponent(getChildId());
-  const response = await fetch(`${learningSyncUrl}?childId=${childId}`);
+  const response = await fetch(`${learningSyncUrl}?childId=${childId}`, {
+    headers: {
+      ...(CONFIGURED_SYNC_TOKEN ? { Authorization: `Bearer ${CONFIGURED_SYNC_TOKEN}` } : {}),
+    },
+  });
   if (!response.ok) {
     throw new Error(`sync pull failed: ${response.status}`);
   }
@@ -586,12 +695,12 @@ export function useLearningStateSync() {
             changedKeyCount: changedKeys.length,
           });
 
-          if (!window.sessionStorage.getItem(RELOAD_MARKER_KEY)) {
-            window.sessionStorage.setItem(RELOAD_MARKER_KEY, '1');
-            window.location.reload();
-            return;
-          }
-        }
+	          window.dispatchEvent(
+	            new CustomEvent('childlearn:learning-state-merged', {
+	              detail: { changedKeys },
+	            }),
+	          );
+	        }
 
         scheduleLearningStateSync('startup');
       })

@@ -134,6 +134,11 @@ export function calculateBatchRankStars({
     flowState === 'easy' || flowState === 'flow' || flowState === 'stretch';
   const cleanBatch = mistakes <= 2;
   const sustainedCombo = maxCombo >= Math.min(5, total);
+  const perfectBatch = correct === total && mistakes === 0 && maxCombo >= total;
 
-  return 1 + (stableLearningState && (cleanBatch || sustainedCombo) ? 1 : 0);
+  return (
+    1 +
+    (stableLearningState && (cleanBatch || sustainedCombo) ? 1 : 0) +
+    (stableLearningState && perfectBatch ? 1 : 0)
+  );
 }

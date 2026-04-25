@@ -28,7 +28,7 @@ describe('rankEngine', () => {
         maxCombo: 10,
         flowState: 'easy',
       }),
-    ).toBe(2);
+	    ).toBe(3);
 
     expect(
       calculateBatchRankStars({

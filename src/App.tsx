@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Award, Gem, Sparkles, Star } from 'lucide-react';
 import { ComboBanner } from './components/ComboBanner/ComboBanner';
@@ -6,23 +14,25 @@ import {
   FeedbackBadge,
   type FeedbackLevel,
 } from './components/FeedbackBadge/FeedbackBadge';
-import { EnglishModulePage } from './components/EnglishModulePage/EnglishModulePage';
 import { FloatingDecoration } from './components/FloatingDecoration/FloatingDecoration';
 import { HomeDashboard } from './components/HomeDashboard/HomeDashboard';
 import { LevelResult } from './components/LevelResult/LevelResult';
-import { LiteracyModulePage } from './components/LiteracyModulePage/LiteracyModulePage';
 import {
   OptionButton,
   type OptionVisualState,
 } from './components/OptionButton/OptionButton';
 import { ParentReportPanel } from './components/ParentReportPanel/ParentReportPanel';
-import { ProgrammingIslandPage } from './components/ProgrammingIslandPage/ProgrammingIslandPage';
 import { QuestionCard } from './components/QuestionCard/QuestionCard';
 import { Stat } from './components/Stat/Stat';
 import { StickerActionModal } from './components/StickerActionModal/StickerActionModal';
-import { StickerAlbumPage } from './components/StickerAlbumPage/StickerAlbumPage';
 import { TopBar } from './components/TopBar/TopBar';
 import { generateQuestion } from './curriculum/questionFactory';
+import {
+  DIAGNOSTIC_QUESTION_COUNT,
+  getDiagnosticQuestion,
+  readDiagnosticSnapshot,
+  writeDiagnosticSnapshot,
+} from './curriculum/diagnostic/diagnosticPlan';
 import { addReviewItem, type ReviewItem } from './curriculum/reviewQueue';
 import type { Question, QuestionOption } from './curriculum/types';
 import {
@@ -38,6 +48,7 @@ import { useAbilityProfile } from './engagement/ability/useAbilityProfile';
 import { useCombo } from './engagement/combo/useCombo';
 import { useDailyFirstWin } from './engagement/daily/useDailyFirstWin';
 import { useDDA } from './engagement/dda/useDDA';
+import { scoreDiagnosticAttempts } from './engagement/dda/diagnosticScoring';
 import {
   approveFlowPolicy,
   createLearningBatchReport,
@@ -60,6 +71,7 @@ import {
   type NumberSpirit,
 } from './engagement/reward/useNumberSpirits';
 import { useRewardGarden, type GardenReward } from './engagement/reward/useRewardGarden';
+import { recordLearningHistory } from './engagement/report/learningHistory';
 import { useSkinUnlock } from './engagement/skin/useSkinUnlock';
 import {
   STICKER_UNLOCK_COMBO_INTERVAL,
@@ -67,7 +79,10 @@ import {
   shouldOfferStickerUnlock,
   useStickers,
 } from './engagement/collection/useStickers';
-import type { Sticker } from './engagement/collection/useStickers';
+import type {
+  Sticker,
+  StickerSeriesProgress,
+} from './engagement/collection/useStickers';
 import type { ProgrammingLevel } from './programming/programmingLevels';
 import { useProgrammingProgress } from './programming/useProgrammingProgress';
 import {
@@ -83,6 +98,7 @@ import {
   type LiteracyItem,
 } from './literacy/literacyItems';
 import { LongPressGate } from './immersion/LongPressGate';
+import { SkeletonScreen } from './immersion/SkeletonScreen';
 import { ToastStack, type ToastMessage } from './immersion/Toast';
 import { useNoInterrupt } from './immersion/useNoInterrupt';
 import { celebrate, type CelebrationLevel } from './theme/confetti';
@@ -108,6 +124,27 @@ import {
 } from './voice/voiceLines';
 import { useVoicePlayer } from './voice/useVoicePlayer';
 
+const EnglishModulePage = lazy(() =>
+  import('./components/EnglishModulePage/EnglishModulePage').then((module) => ({
+    default: module.EnglishModulePage,
+  })),
+);
+const LiteracyModulePage = lazy(() =>
+  import('./components/LiteracyModulePage/LiteracyModulePage').then((module) => ({
+    default: module.LiteracyModulePage,
+  })),
+);
+const ProgrammingIslandPage = lazy(() =>
+  import('./components/ProgrammingIslandPage/ProgrammingIslandPage').then((module) => ({
+    default: module.ProgrammingIslandPage,
+  })),
+);
+const StickerAlbumPage = lazy(() =>
+  import('./components/StickerAlbumPage/StickerAlbumPage').then((module) => ({
+    default: module.StickerAlbumPage,
+  })),
+);
+
 type AppScene =
   | 'home'
   | 'practice'
@@ -116,6 +153,8 @@ type AppScene =
   | 'literacy'
   | 'english'
   | 'programming';
+
+type PracticeRunMode = 'level' | 'diagnostic';
 
 interface SessionStats {
   attempted: number;
@@ -218,6 +257,7 @@ interface StoredAppSnapshot {
   recentFlowStates: FlowState[];
   currentRunPolicy: ApprovedFlowPolicy | null;
   currentRunPolicyBatchId: string | null;
+  currentRunMode?: PracticeRunMode;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -378,6 +418,10 @@ function readStoredAppSnapshot(): StoredAppSnapshot | null {
         typeof parsed.currentRunPolicyBatchId === 'string'
           ? parsed.currentRunPolicyBatchId
           : null,
+      currentRunMode:
+        parsed.currentRunMode === 'diagnostic' || parsed.currentRunMode === 'level'
+          ? parsed.currentRunMode
+          : 'level',
     };
   } catch {
     return null;
@@ -643,6 +687,9 @@ export default function App() {
   );
   const currentRunPolicyBatchIdRef = useRef<string | null>(
     initialAppSnapshot?.currentRunPolicyBatchId ?? null,
+  );
+  const currentRunModeRef = useRef<PracticeRunMode>(
+    initialAppSnapshot?.currentRunMode ?? 'level',
   );
   const practiceRunIdRef = useRef<string | null>(
     initialAppSnapshot?.practiceRunId ?? null,
@@ -1114,6 +1161,10 @@ export default function App() {
   );
 
   const generateAdaptiveQuestion = useCallback((difficulty: number, serial: number) => {
+    if (currentRunModeRef.current === 'diagnostic' && serial < DIAGNOSTIC_QUESTION_COUNT) {
+      return getDiagnosticQuestion(serial);
+    }
+
     const queuedReview = reviewQueueRef.current[0];
     if (queuedReview && serial > 0 && serial % 4 === 0) {
       return {
@@ -1145,7 +1196,7 @@ export default function App() {
     });
   }, []);
 
-  useNoInterrupt(addToast);
+  useNoInterrupt(addToast, scene === 'practice');
 
   useEffect(() => {
     track(
@@ -1338,6 +1389,7 @@ export default function App() {
       recentFlowStates: recentFlowStatesRef.current,
       currentRunPolicy: currentRunPolicyRef.current,
       currentRunPolicyBatchId: currentRunPolicyBatchIdRef.current,
+      currentRunMode: currentRunModeRef.current,
     });
   }, [
     answered,
@@ -1412,18 +1464,25 @@ export default function App() {
     const runId = createClientId('run');
     const startingPolicy = flowShadowPolicy;
     const startingPolicyBatchId = flowShadowReport?.batchId ?? null;
+    const shouldRunDiagnostic = !readDiagnosticSnapshot();
+    const runMode: PracticeRunMode = shouldRunDiagnostic ? 'diagnostic' : 'level';
     flowObserverRequestIdRef.current += 1;
     practiceRunIdRef.current = runId;
     currentRunPolicyRef.current = startingPolicy;
     currentRunPolicyBatchIdRef.current = startingPolicyBatchId;
+    currentRunModeRef.current = runMode;
     const difficulty = startingPolicy?.nextDifficulty ?? dda.difficulty;
     const levelPack = getLevelPackForDifficulty(difficulty);
-    activeLevelPackIdRef.current = levelPack.id;
-    const goal = Math.min(
-      startingPolicy?.batchSize ?? levelPack.items.length,
-      levelPack.items.length,
-    );
-    const firstQuestion = generateAdaptiveQuestion(difficulty, 0);
+    activeLevelPackIdRef.current = shouldRunDiagnostic ? null : levelPack.id;
+    const goal = shouldRunDiagnostic
+      ? DIAGNOSTIC_QUESTION_COUNT
+      : Math.min(
+          startingPolicy?.batchSize ?? levelPack.items.length,
+          levelPack.items.length,
+        );
+    const firstQuestion = shouldRunDiagnostic
+      ? getDiagnosticQuestion(0)
+      : generateAdaptiveQuestion(difficulty, 0);
     const line = buildStartVoiceLine();
 
     clearScheduled();
@@ -1444,7 +1503,7 @@ export default function App() {
     setLevelStarsEarned(0);
     setLevelLatestSticker(null);
     setLevelNewSpirits([]);
-    setActiveLevelPackId(levelPack.id);
+    setActiveLevelPackId(shouldRunDiagnostic ? null : levelPack.id);
     setLevelQuestionGoal(goal);
     setLastResult(null);
     setFlowShadowReport(null);
@@ -1465,9 +1524,10 @@ export default function App() {
       runId,
       difficulty,
       goal,
-      levelPackId: levelPack.id,
-      levelPackTitle: levelPack.title,
-      levelPackGoal: levelPack.shortGoal,
+      levelPackId: shouldRunDiagnostic ? null : levelPack.id,
+      levelPackTitle: shouldRunDiagnostic ? '入学小测' : levelPack.title,
+      levelPackGoal: shouldRunDiagnostic ? '找到合适起点' : levelPack.shortGoal,
+      runMode,
       flowState: startingPolicy?.finalState ?? null,
       flowAction: startingPolicy?.finalAction ?? null,
     });
@@ -1751,6 +1811,67 @@ export default function App() {
     speak,
   ]);
 
+  const completeDiagnosticRun = useCallback(
+    ({
+      records,
+      mistakes,
+      maxCombo,
+      latestSticker,
+      newSpirits,
+    }: {
+      records: QuestionAttemptRecord[];
+      mistakes: number;
+      maxCombo: number;
+      latestSticker: Sticker | null;
+      newSpirits: NumberSpirit[];
+    }) => {
+      const score = scoreDiagnosticAttempts(records);
+      writeDiagnosticSnapshot({
+        schemaVersion: 1,
+        completedAt: Date.now(),
+        recommendedDifficulty: score.recommendedDifficulty,
+        correctCount: score.correctCount,
+        firstTryCorrectCount: score.firstTryCorrectCount,
+      });
+      dda.applyDiagnosticResult(score.recommendedDifficulty);
+      const gardenReward = rewardGarden.claimLevelCompletion({
+        correct: score.correctCount,
+        total: DIAGNOSTIC_QUESTION_COUNT,
+        mistakes,
+        maxCombo,
+      });
+      const result: LevelResultSnapshot = {
+        correct: score.correctCount,
+        total: DIAGNOSTIC_QUESTION_COUNT,
+        mistakes,
+        maxCombo,
+        starsEarned: 0,
+        rankName: rank.rank.name,
+        difficulty: score.recommendedDifficulty,
+        sticker: latestSticker,
+        gardenReward,
+        newSpirits,
+      };
+
+      currentRunModeRef.current = 'level';
+      combo.endRun();
+      setLevelStarsEarned(0);
+      setLastResult(result);
+      setFeedback(null);
+      setAnswered(false);
+      setSelectedOptionId(null);
+      setScene('result');
+      track('diagnostic.complete', {
+        runId: practiceRunIdRef.current,
+        correct: score.correctCount,
+        firstTryCorrect: score.firstTryCorrectCount,
+        recommendedDifficulty: score.recommendedDifficulty,
+        readiness: score.readinessLabel,
+      });
+    },
+    [combo, dda, rank.rank.name, rewardGarden],
+  );
+
   const completeLevelRun = useCallback(
     ({
       records,
@@ -1803,6 +1924,7 @@ export default function App() {
         newSpirits,
       };
 
+      currentRunModeRef.current = 'level';
       combo.endRun();
       setLevelStarsEarned(rankStarsAwarded);
       setLastResult(result);
@@ -1918,6 +2040,7 @@ export default function App() {
         ];
         levelAttemptRecordsRef.current = nextAttemptRecords;
         ability.recordAttempt(completedAttemptRecord);
+        recordLearningHistory(completedAttemptRecord);
         const flowId = beginFlow();
         const nextDda = dda.onCorrect();
         const nextCombo = combo.hit();
@@ -2018,6 +2141,17 @@ export default function App() {
           );
 
           if (nextLevelProgress >= levelQuestionGoal) {
+            if (currentRunModeRef.current === 'diagnostic') {
+              completeDiagnosticRun({
+                records: nextAttemptRecords,
+                mistakes: levelMistakes,
+                maxCombo: nextLevelBestCombo,
+                latestSticker: nextLevelSticker,
+                newSpirits: nextLevelNewSpirits,
+              });
+              return;
+            }
+
             completeLevelRun({
               records: nextAttemptRecords,
               ddaDifficulty: nextDda.difficulty,
@@ -2098,6 +2232,7 @@ export default function App() {
         ];
         levelAttemptRecordsRef.current = nextAttemptRecords;
         ability.recordAttempt(completedAttemptRecord);
+        recordLearningHistory(completedAttemptRecord);
         const nextLevelProgress = levelProgress + 1;
         const interimFlowPolicy = maybeCreateInterimFlowPolicy(
           nextAttemptRecords,
@@ -2144,6 +2279,17 @@ export default function App() {
           );
 
           if (nextLevelProgress >= levelQuestionGoal) {
+            if (currentRunModeRef.current === 'diagnostic') {
+              completeDiagnosticRun({
+                records: nextAttemptRecords,
+                mistakes: nextLevelMistakes,
+                maxCombo: levelBestCombo,
+                latestSticker: levelLatestSticker,
+                newSpirits: levelNewSpirits,
+              });
+              return;
+            }
+
             completeLevelRun({
               records: nextAttemptRecords,
               ddaDifficulty: nextDda.difficulty,
@@ -2191,6 +2337,7 @@ export default function App() {
       ability,
       beginFlow,
       combo,
+      completeDiagnosticRun,
       completeLevelRun,
       createCompletedAttemptRecord,
       createFlowShadowPolicy,
@@ -2282,6 +2429,7 @@ export default function App() {
       {scene === 'practice' ? <FeedbackBadge level={feedback} /> : null}
       {scene === 'practice' ? <ComboBanner combo={combo.current} /> : null}
 
+      <Suspense fallback={<SkeletonScreen />}>
       <AnimatePresence mode="wait">
         {scene === 'home' ? (
           <HomeDashboard
@@ -2293,9 +2441,11 @@ export default function App() {
             correct={stats.correct}
             attempted={stats.attempted}
             difficulty={dda.difficulty}
-            stickers={stickers.collected}
-            stickerTotal={stickers.total}
-            skins={skins}
+	            stickers={stickers.collected}
+	            stickerTotal={stickers.total}
+	            stickerSeriesProgress={stickers.seriesProgress}
+	            duplicateShards={stickers.duplicateShards}
+	            skins={skins}
             levelProgress={levelProgress}
             levelGoal={homeLevelGoal}
             garden={rewardGarden.garden}
@@ -2343,9 +2493,10 @@ export default function App() {
         ) : scene === 'stickers' ? (
           <StickerAlbumPage
             key="stickers"
-            stickers={stickers.collected}
-            stickerTotal={stickers.total}
-            onBack={handleHome}
+	            stickers={stickers.collected}
+	            stickerTotal={stickers.total}
+	            seriesProgress={stickers.seriesProgress}
+	            onBack={handleHome}
             onInspectSticker={handleInspectSticker}
           />
         ) : scene === 'result' && lastResult ? (
@@ -2415,6 +2566,7 @@ export default function App() {
           </motion.section>
         )}
       </AnimatePresence>
+      </Suspense>
 
       <LongPressGate onOpen={() => setParentReportOpen(true)} />
 

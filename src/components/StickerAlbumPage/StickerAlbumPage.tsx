@@ -1,13 +1,18 @@
 import { ArrowLeft, BookOpen, Lock, Sparkles, Star, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
-import type { Sticker } from '../../engagement/collection/useStickers';
+import {
+  getStickerMeta,
+  type Sticker,
+  type StickerSeriesProgress,
+} from '../../engagement/collection/useStickers';
 import { SPRING } from '../../theme/springs';
 import { StickerArtwork } from '../_primitives/StickerArtwork';
 
 interface StickerAlbumPageProps {
   stickers: Sticker[];
   stickerTotal: number;
+  seriesProgress: StickerSeriesProgress[];
   onBack: () => void;
   onInspectSticker: (sticker: Sticker) => void;
 }
@@ -41,6 +46,7 @@ function AlbumMetric({
 export function StickerAlbumPage({
   stickers,
   stickerTotal,
+  seriesProgress,
   onBack,
   onInspectSticker,
 }: StickerAlbumPageProps) {
@@ -128,6 +134,29 @@ export function StickerAlbumPage({
                 }
               />
             </div>
+            {seriesProgress.length > 0 ? (
+              <div className="mt-4 grid gap-2 md:grid-cols-2">
+                {seriesProgress.slice(0, 4).map((series) => (
+                  <div
+                    key={series.series}
+                    className="rounded-[1.25rem] bg-white/74 p-3 ring-1 ring-emerald-900/10"
+                  >
+                    <div className="flex items-center justify-between gap-3 text-sm font-black text-emerald-800">
+                      <span className="truncate">{series.series}</span>
+                      <span>{series.collected}/{series.total}</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-emerald-50">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400"
+                        style={{
+                          width: `${Math.min((series.collected / series.total) * 100, 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <aside className="flex min-w-0 flex-col justify-between gap-3 rounded-[1.5rem] bg-gradient-to-br from-sky-600 via-teal-500 to-rose-500 p-4 text-white shadow-xl shadow-sky-500/25">
@@ -192,16 +221,19 @@ export function StickerAlbumPage({
                   className="aspect-[4/3] w-full rounded-[1rem] shadow-md shadow-sky-200/50"
                   imageClassName="object-cover"
                 />
-                <div className="mt-3 flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-xl font-black text-emerald-950">
-                      {sticker.name}
-                    </div>
-                    <div className="mt-1 flex items-center gap-1.5 truncate text-sm font-black text-emerald-700/78">
-                      <Zap size={15} fill="currentColor" strokeWidth={3} />
-                      {sticker.signatureMove}
-                    </div>
-                  </div>
+	                <div className="mt-3 flex items-start justify-between gap-2">
+	                  <div className="min-w-0">
+	                    <div className="truncate text-xl font-black text-emerald-950">
+	                      {sticker.name}
+	                    </div>
+	                    <div className="mt-1 flex items-center gap-1.5 truncate text-sm font-black text-emerald-700/78">
+	                      <Zap size={15} fill="currentColor" strokeWidth={3} />
+	                      {sticker.signatureMove}
+	                    </div>
+	                    <div className="mt-1 text-xs font-black text-sky-700">
+	                      {getStickerMeta(sticker).rarityLabel} · {getStickerMeta(sticker).series}
+	                    </div>
+	                  </div>
                   <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-100">
                     #{recentStickers.length - index}
                   </span>

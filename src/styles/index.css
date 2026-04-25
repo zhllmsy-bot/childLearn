@@ -43,6 +43,12 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+button:focus-visible,
+a:focus-visible {
+  outline: 4px solid #064e3b;
+  outline-offset: 3px;
+}
+
 #root {
   min-height: 100svh;
 }
@@ -259,5 +265,40 @@ button {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    color: #052e16;
+  }
+
+  button,
+  [role='button'] {
+    text-decoration-thickness: 0.12em;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .parent-report-panel,
+  .parent-report-panel * {
+    visibility: visible;
+  }
+
+  .parent-report-panel {
+    inset: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    position: absolute !important;
   }
 }

@@ -15,12 +15,16 @@ import {
   Repeat2,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import type { ReactNode } from 'react';
-import type { Sticker } from '../../engagement/collection/useStickers';
+import { memo, type ReactNode } from 'react';
+import type {
+  Sticker,
+  StickerSeriesProgress,
+} from '../../engagement/collection/useStickers';
 import type { NumberSpirit } from '../../engagement/reward/useNumberSpirits';
 import type { GardenState } from '../../engagement/reward/useRewardGarden';
 import type { Skin } from '../../engagement/skin/useSkinUnlock';
 import type { LearningCard } from '../../learningCards/types';
+import { zhCN } from '../../i18n/zh-CN';
 import { SPRING } from '../../theme/springs';
 import { ELEV } from '../../theme/tokens';
 import { BigButton } from '../_primitives/BigButton';
@@ -36,6 +40,8 @@ interface HomeDashboardProps {
   difficulty: number;
   stickers: Sticker[];
   stickerTotal: number;
+  stickerSeriesProgress: StickerSeriesProgress[];
+  duplicateShards: number;
   skins: Skin[];
   levelProgress: number;
   levelGoal: number;
@@ -287,11 +293,13 @@ function LanguagePreviewPanel({
     <section className="mt-4 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-sm ring-1 ring-emerald-900/10 backdrop-blur-xl">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm font-black text-emerald-700/80">语言模块</div>
-          <h2 className="text-4xl font-black text-emerald-950">语言乐园</h2>
-        </div>
-        <div className="rounded-full bg-emerald-50 px-4 py-2 text-base font-black text-emerald-800 ring-1 ring-emerald-100">
-          双语卡片
+	          <div className="text-sm font-black text-emerald-700/80">
+	            {zhCN.home.languageModuleEyebrow}
+	          </div>
+	          <h2 className="text-4xl font-black text-emerald-950">语言乐园</h2>
+	        </div>
+	        <div className="rounded-full bg-emerald-50 px-4 py-2 text-base font-black text-emerald-800 ring-1 ring-emerald-100">
+	          卡片库
         </div>
       </div>
 
@@ -337,7 +345,7 @@ function ProgrammingPreviewPanel({
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-black text-white/80">
             <Code2 size={18} strokeWidth={3} />
-            新入口
+	            {zhCN.home.programmingModuleEyebrow}
           </div>
           <h2 className="mt-2 text-4xl font-black leading-tight md:text-5xl">
             光之编程馆
@@ -391,7 +399,7 @@ function ProgrammingPreviewPanel({
   );
 }
 
-export function HomeDashboard({
+function HomeDashboardComponent({
   rankName,
   stars,
   currentCombo,
@@ -401,6 +409,8 @@ export function HomeDashboard({
   difficulty,
   stickers,
   stickerTotal,
+  stickerSeriesProgress,
+  duplicateShards,
   skins,
   levelProgress,
   levelGoal,
@@ -432,6 +442,7 @@ export function HomeDashboard({
   const stickerProgress =
     stickerTotal === 0 ? 0 : Math.min((stickers.length / stickerTotal) * 100, 100);
   const albumSlots = Array.from({ length: 10 }, (_, index) => recentStickers[index]);
+  const leadingSeries = stickerSeriesProgress[0];
 
   return (
     <motion.section
@@ -519,18 +530,29 @@ export function HomeDashboard({
               <div className="text-sm font-black text-white/80">继续练习</div>
               <div className="mt-1 text-3xl font-black">点亮下一枚徽章</div>
             </div>
-            <div className="rounded-2xl bg-white/18 p-3 ring-1 ring-white/25">
-              <div className="flex items-center justify-between text-sm font-black">
-                <span>光之贴纸</span>
-                <span>{stickers.length}/{stickerTotal}</span>
+              <div className="rounded-2xl bg-white/18 p-3 ring-1 ring-white/25">
+                <div className="flex items-center justify-between text-sm font-black">
+                  <span>{leadingSeries?.series ?? '光之贴纸'}</span>
+                  <span>{leadingSeries ? `${leadingSeries.collected}/${leadingSeries.total}` : `${stickers.length}/${stickerTotal}`}</span>
+                </div>
+                <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className="h-full rounded-full bg-white"
+                    style={{
+                      width: `${
+                        leadingSeries
+                          ? Math.min((leadingSeries.collected / leadingSeries.total) * 100, 100)
+                          : stickerProgress
+                      }%`,
+                    }}
+                  />
+                </div>
+                {duplicateShards > 0 ? (
+                  <div className="mt-2 text-xs font-black text-white/75">
+                    重复光片 {duplicateShards}
+                  </div>
+                ) : null}
               </div>
-              <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/20">
-                <div
-                  className="h-full rounded-full bg-white"
-                  style={{ width: `${stickerProgress}%` }}
-                />
-              </div>
-            </div>
             <BigButton
               type="button"
               tone="success"
@@ -538,7 +560,7 @@ export function HomeDashboard({
               className="flex w-full items-center justify-center gap-3 rounded-2xl bg-white px-6 py-4 text-2xl text-emerald-700 shadow-lg shadow-emerald-900/15 ring-white"
             >
               <Play size={30} fill="currentColor" strokeWidth={3.2} />
-              继续闯关
+	              {zhCN.home.primaryAction}
             </BigButton>
           </aside>
         </div>
@@ -656,3 +678,5 @@ export function HomeDashboard({
     </motion.section>
   );
 }
+
+export const HomeDashboard = memo(HomeDashboardComponent);
