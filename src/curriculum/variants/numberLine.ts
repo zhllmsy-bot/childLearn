@@ -17,6 +17,7 @@ export function buildNumberLineQuestion(
     answer,
     options,
     objects: Array.from({ length: answer }, () => '⭐'),
+    theme: { emoji: '⭐', colorHint: 'amber' },
     numberLine: { start, end },
     barModel: [start, answer],
     scaffoldText: `从 ${start} 开始，每跳一步数一个，跳到 ${end} 停。`,

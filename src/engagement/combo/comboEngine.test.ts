@@ -10,14 +10,14 @@ describe('comboEngine', () => {
     expect(second.maxEver).toBe(2);
   });
 
-  it('resets current combo on miss while preserving maxEver', () => {
+  it('protects current combo on a single miss while preserving maxEver', () => {
     const next = missCombo({ current: 34, maxEver: 34 });
 
-    expect(next.current).toBe(0);
+    expect(next.current).toBe(34);
     expect(next.maxEver).toBe(34);
   });
 
-  it('never goes below zero after a miss', () => {
+  it('keeps zero stable after a miss', () => {
     const next = missCombo(INITIAL_COMBO_STATE);
 
     expect(next.current).toBe(0);

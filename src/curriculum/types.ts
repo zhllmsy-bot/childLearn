@@ -14,6 +14,11 @@ export interface QuestionOption {
   value: number;
 }
 
+export interface QuestionTheme {
+  emoji: string;
+  colorHint: string;
+}
+
 export interface Question {
   id: string;
   level: QuestionLevel;
@@ -32,6 +37,7 @@ export interface Question {
     start: number;
     end: number;
   };
+  theme?: QuestionTheme;
   barModel: number[];
   scaffoldText: string;
   principleText: string;

@@ -82,7 +82,15 @@ export function buildOptions(
   rng: () => number = Math.random,
 ): QuestionOption[] {
   const candidates = new Set<number>([answer]);
-  const offsets = shuffle([-3, -2, -1, 1, 2, 3, 4, -4], rng);
+  const nearOffsets = shuffle([-1, 1], rng);
+  const offsets = shuffle([-3, -2, 2, 3, 4, -4], rng);
+
+  nearOffsets.forEach((offset) => {
+    const next = answer + offset;
+    if (next >= 0 && next <= maxValue) {
+      candidates.add(next);
+    }
+  });
 
   offsets.forEach((offset) => {
     if (candidates.size >= 4) {

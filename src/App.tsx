@@ -609,6 +609,9 @@ export default function App() {
   const [reviewQueue, setReviewQueue] = useState<ReviewItem[]>(
     () => initialAppSnapshot?.reviewQueue ?? [],
   );
+  const reviewQueueRef = useRef<ReviewItem[]>(
+    initialAppSnapshot?.reviewQueue ?? [],
+  );
   const [parentReportOpen, setParentReportOpen] = useState(false);
   const [selectedSticker, setSelectedSticker] = useState<Sticker | null>(
     () => findStickerById(initialAppSnapshot?.selectedStickerId) ?? null,
@@ -710,6 +713,10 @@ export default function App() {
   }, []);
 
   const isCurrentFlow = useCallback((flowId: number) => flowIdRef.current === flowId, []);
+
+  useEffect(() => {
+    reviewQueueRef.current = reviewQueue;
+  }, [reviewQueue]);
 
   const questionEventPayload = useCallback(
     (
@@ -1107,6 +1114,14 @@ export default function App() {
   );
 
   const generateAdaptiveQuestion = useCallback((difficulty: number, serial: number) => {
+    const queuedReview = reviewQueueRef.current[0];
+    if (queuedReview && serial > 0 && serial % 4 === 0) {
+      return {
+        ...queuedReview.question,
+        id: `${queuedReview.question.id}-review-${serial}`,
+      };
+    }
+
     const plan = selectFlowQuestionPlan({
       policy: currentRunPolicyRef.current,
       fallbackDifficulty: difficulty,
@@ -1869,6 +1884,14 @@ export default function App() {
       );
 
       if (isCorrect) {
+        setReviewQueue((queue) => {
+          if (!queue.some((item) => item.factId === question.factId)) {
+            return queue;
+          }
+          const nextQueue = queue.filter((item) => item.factId !== question.factId);
+          reviewQueueRef.current = nextQueue;
+          return nextQueue;
+        });
         const completedAttemptRecord = createCompletedAttemptRecord(question, option);
         track(
           'question.completed',
@@ -2023,7 +2046,11 @@ export default function App() {
       setHintStage(nextHintStage);
       const wrongFeedbackStartedAt = Date.now();
       setFeedback('wrong');
-      setReviewQueue((queue) => addReviewItem(queue, question));
+      setReviewQueue((queue) => {
+        const nextQueue = addReviewItem(queue, question);
+        reviewQueueRef.current = nextQueue;
+        return nextQueue;
+      });
       playTryAgainFeedback();
       track(
         'question.hint_requested',
@@ -2358,11 +2385,13 @@ export default function App() {
               <LevelProgressStrip current={levelProgress} total={levelQuestionGoal} />
 
               <div className="ipad-options-grid mx-auto grid w-full gap-4">
-                {optionStates.map(({ option, state }) => (
+                {optionStates.map(({ option, state }, index) => (
                   <OptionButton
                     key={`${question.id}-${option.id}`}
                     option={option}
                     state={state}
+                    paletteIndex={index}
+                    visualEmoji={question.theme?.emoji ?? question.objects[0] ?? '✦'}
                     onSelect={handleSelect}
                   />
                 ))}

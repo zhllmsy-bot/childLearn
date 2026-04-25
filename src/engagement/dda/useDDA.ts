@@ -23,6 +23,12 @@ function readStoredDdaState(): DdaState {
     const consecutiveWrong = Number(
       parsed.consecutiveWrong ?? INITIAL_DDA_STATE.consecutiveWrong,
     );
+    const recentWindow = Array.isArray(parsed.recentWindow)
+      ? parsed.recentWindow
+          .map((item) => Number(item))
+          .filter((item) => item === 0 || item === 1)
+          .slice(-10)
+      : INITIAL_DDA_STATE.recentWindow;
 
     return {
       difficulty: Number.isFinite(difficulty)
@@ -34,6 +40,7 @@ function readStoredDdaState(): DdaState {
       consecutiveWrong: Number.isFinite(consecutiveWrong)
         ? Math.min(Math.max(Math.round(consecutiveWrong), 0), 1)
         : INITIAL_DDA_STATE.consecutiveWrong,
+      recentWindow,
     };
   } catch {
     return INITIAL_DDA_STATE;
@@ -57,6 +64,7 @@ export function useDDA() {
       difficulty: Math.min(Math.max(Math.round(difficulty), 1), 10),
       consecutiveCorrect: 0,
       consecutiveWrong: 0,
+      recentWindow: [],
     };
 
     writeStoredDdaState(next);
@@ -84,6 +92,7 @@ export function useDDA() {
       difficulty: state.difficulty,
       consecutiveCorrect: state.consecutiveCorrect,
       consecutiveWrong: state.consecutiveWrong,
+      recentWindow: state.recentWindow,
       onCorrect: () => record('correct'),
       onWrong: () => record('wrong'),
       applyDifficulty,
@@ -96,6 +105,7 @@ export function useDDA() {
       state.consecutiveCorrect,
       state.consecutiveWrong,
       state.difficulty,
+      state.recentWindow,
     ],
   );
 }

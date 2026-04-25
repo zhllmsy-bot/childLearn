@@ -17,6 +17,7 @@ export function buildCompareQuestion(
     answer,
     options,
     objects: Array.from({ length: answer }, () => '🍊'),
+    theme: { emoji: '🍊', colorHint: 'orange' },
     comparePair: { left, right },
     barModel: [left, right],
     scaffoldText: '把两边排成两行，哪一行更长，数量就更大。',

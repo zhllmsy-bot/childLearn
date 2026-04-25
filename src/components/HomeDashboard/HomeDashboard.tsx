@@ -22,6 +22,7 @@ import type { GardenState } from '../../engagement/reward/useRewardGarden';
 import type { Skin } from '../../engagement/skin/useSkinUnlock';
 import type { LearningCard } from '../../learningCards/types';
 import { SPRING } from '../../theme/springs';
+import { ELEV } from '../../theme/tokens';
 import { BigButton } from '../_primitives/BigButton';
 import { StickerArtwork } from '../_primitives/StickerArtwork';
 
@@ -441,10 +442,9 @@ export function HomeDashboard({
       transition={SPRING.smooth}
       className="ipad-home-dashboard relative z-10 mx-auto w-full max-w-7xl pb-24"
     >
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/88 p-5 shadow-[0_24px_80px_rgba(15,118,110,0.14)] ring-1 ring-emerald-900/5 backdrop-blur-xl md:p-6">
-        <div className="pointer-events-none absolute -right-8 -top-10 text-[7rem] font-black tracking-normal text-sky-500 opacity-10">
-          M78
-        </div>
+      <section
+        className={`relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/88 p-5 ${ELEV.card} ring-1 ring-emerald-900/5 backdrop-blur-xl md:p-6`}
+      >
         <div className="pointer-events-none absolute bottom-2 left-[48%] text-6xl text-rose-400 opacity-10">
           ✦
         </div>

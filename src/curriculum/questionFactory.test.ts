@@ -15,6 +15,14 @@ describe('questionFactory', () => {
     expect(new Set(values).size).toBe(4);
   });
 
+  it('prioritizes adjacent distractors around the answer', () => {
+    const options = buildOptions(5, 10, fixedRng(0.42));
+    const values = options.map((option) => option.value);
+
+    expect(values).toContain(4);
+    expect(values).toContain(6);
+  });
+
   it('uses visual-first variants in the early part-whole band', () => {
     const variants = Array.from({ length: 4 }, (_, serial) =>
       generateQuestion({ difficulty: 4, serial, rng: fixedRng(0.35) }).variant,
@@ -137,5 +145,17 @@ describe('questionFactory', () => {
     });
 
     expect(question.variant).toBe('story');
+  });
+
+  it('adds a visual theme for answer controls and representations', () => {
+    const question = generateQuestion({
+      difficulty: 4,
+      serial: 0,
+      variant: 'makeTen',
+      rng: fixedRng(0.25),
+    });
+
+    expect(question.theme?.emoji).toBe('🍓');
+    expect(question.theme?.colorHint).toBe('pink');
   });
 });

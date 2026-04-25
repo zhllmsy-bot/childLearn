@@ -9,7 +9,15 @@ const PALETTE = {
   party: ['#FFB6C1', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA'],
 } as const;
 
+const MAX_EMOJI_RAIN_NODES = 36;
+let activeEmojiRainNodes = 0;
+
 function emojiRain() {
+  if (activeEmojiRainNodes >= MAX_EMOJI_RAIN_NODES) {
+    return;
+  }
+
+  activeEmojiRainNodes += 1;
   const node = document.createElement('div');
   const emojis = ['⭐', '🌟', '🎉', '🎊', '🎈'];
   node.textContent = emojis[Math.floor(Math.random() * emojis.length)];
@@ -24,12 +32,15 @@ function emojiRain() {
     node.style.transform = `translateY(110vh) rotate(${Math.random() * 720 - 360}deg)`;
     node.style.opacity = '0';
   });
-  window.setTimeout(() => node.remove(), 2600);
+  window.setTimeout(() => {
+    node.remove();
+    activeEmojiRainNodes = Math.max(0, activeEmojiRainNodes - 1);
+  }, 2600);
 }
 
 export function celebrate(level: CelebrationLevel = 'correct') {
   const scalar = level === 'amazing' ? 1.4 : level === 'great' ? 1.2 : 1;
-  const count = level === 'amazing' ? 160 : level === 'great' ? 120 : 90;
+  const count = level === 'amazing' ? 160 : level === 'great' ? 120 : 40;
   const main = level === 'amazing' ? PALETTE.party : PALETTE.candy;
 
   confetti({
@@ -45,6 +56,10 @@ export function celebrate(level: CelebrationLevel = 'correct') {
     shapes: ['circle', 'square'],
     zIndex: 9999,
   });
+
+  if (level === 'correct') {
+    return;
+  }
 
   window.setTimeout(() => {
     confetti({

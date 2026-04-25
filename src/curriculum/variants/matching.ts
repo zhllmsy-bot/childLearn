@@ -15,6 +15,7 @@ export function buildMatchingQuestion(
     answer: count,
     options,
     objects: Array.from({ length: count }, () => '🍎'),
+    theme: { emoji: '🍎', colorHint: 'rose' },
     barModel: [count],
     scaffoldText: '可以一个一个点着数，最后一个数就是总数。',
     principleText: `${count} 个苹果和数字 ${count} 是同一个数量。`,

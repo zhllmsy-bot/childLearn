@@ -18,7 +18,7 @@ export function hitCombo(state: ComboState): ComboState {
 
 export function missCombo(state: ComboState): ComboState {
   return {
-    current: 0,
+    current: state.current,
     maxEver: state.maxEver,
   };
 }

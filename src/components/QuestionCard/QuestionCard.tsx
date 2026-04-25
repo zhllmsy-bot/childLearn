@@ -26,8 +26,8 @@ const CARD_SUCCESS_MOTION = {
 };
 
 const CARD_SUCCESS_TIMING = {
-  duration: 1.95,
-  times: [0, 0.28, 0.74, 1],
+  duration: 1.1,
+  times: [0, 0.18, 0.72, 1],
   ease: 'easeInOut' as const,
 };
 
@@ -63,8 +63,8 @@ function CardShatterBurst() {
             rotate: piece.rotate,
           }}
           transition={{
-            delay: 1.08 + index * 0.012,
-            duration: 0.7,
+            delay: 0.48 + index * 0.01,
+            duration: 0.48,
             times: [0, 0.22, 0.72, 1],
             ease: 'easeOut',
           }}
@@ -76,14 +76,16 @@ function CardShatterBurst() {
 }
 
 function ConcreteView({ question }: { question: Question }) {
+  const emoji = question.theme?.emoji ?? question.objects[0] ?? '🍊';
+
   if (question.comparePair) {
     return (
       <div className="grid gap-4 text-4xl font-black md:grid-cols-2">
         <div className="rounded-3xl bg-emerald-50/80 p-4 ring-2 ring-white">
-          {Array.from({ length: question.comparePair.left }, () => '🍊').join('')}
+          {Array.from({ length: question.comparePair.left }, () => emoji).join('')}
         </div>
         <div className="rounded-3xl bg-amber-50/80 p-4 ring-2 ring-white">
-          {Array.from({ length: question.comparePair.right }, () => '🍊').join('')}
+          {Array.from({ length: question.comparePair.right }, () => emoji).join('')}
         </div>
       </div>
     );
@@ -182,8 +184,10 @@ function SegmentedCells({ tones, max }: { tones: SegmentTone[]; max: number }) {
       {Array.from({ length: max }, (_, index) => (
         <span
           key={index}
-          className={`h-7 rounded-lg shadow-sm ${SEGMENT_CLASS[tones[index] ?? 'ghost']}`}
-        />
+          className={`flex h-10 items-center justify-center rounded-lg text-xs font-black text-emerald-950/65 shadow-sm md:h-14 md:text-sm ${SEGMENT_CLASS[tones[index] ?? 'ghost']}`}
+        >
+          {index + 1}
+        </span>
       ))}
     </div>
   );

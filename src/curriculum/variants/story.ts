@@ -20,6 +20,7 @@ export function buildStoryQuestion(
       ...Array.from({ length: first }, () => '🍎'),
       ...Array.from({ length: second }, () => '🍐'),
     ],
+    theme: { emoji: '🍐', colorHint: 'lime' },
     barModel: [first, second],
     scaffoldText: '先数第一堆，再接着数第二堆。',
     principleText: `${first} 个和 ${second} 个放在一起，一共是 ${answer} 个。`,

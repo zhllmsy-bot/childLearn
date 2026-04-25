@@ -72,7 +72,7 @@ export function useCombo() {
     setState((previous) => {
       const next = missCombo(previous);
       writeStoredComboState(next);
-      track('combo.reset', {
+      track('combo.miss_protected', {
         from: previous.current,
         to: next.current,
         max: previous.maxEver,

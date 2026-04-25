@@ -17,6 +17,7 @@ export function buildMissingQuestion(
     answer: missing,
     options,
     objects: Array.from({ length: first }, () => '🍇'),
+    theme: { emoji: '🍇', colorHint: 'violet' },
     barModel: [first, missing],
     scaffoldText: `从 ${first} 开始往上数，数到 ${sum} 停下。`,
     principleText: `${first} 加上 ${missing}，才会到 ${sum}。`,

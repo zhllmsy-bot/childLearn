@@ -12,11 +12,19 @@ export type OptionVisualState =
 interface OptionButtonProps {
   option: QuestionOption;
   state: OptionVisualState;
+  paletteIndex?: number;
+  visualEmoji?: string;
   onSelect: (option: QuestionOption) => void;
 }
 
-const stateClass: Record<OptionVisualState, string> = {
-  idle: 'bg-gradient-to-br from-rose-300 to-rose-400 text-white shadow-rose-400/40 ring-white',
+const IDLE_PALETTE = [
+  'from-rose-300 to-rose-400 shadow-rose-400/40',
+  'from-sky-300 to-sky-500 shadow-sky-400/40',
+  'from-amber-300 to-orange-400 shadow-amber-400/40',
+  'from-violet-300 to-purple-500 shadow-violet-400/40',
+] as const;
+
+const stateClass: Record<Exclude<OptionVisualState, 'idle'>, string> = {
   correct:
     'bg-gradient-to-br from-emerald-300 to-teal-500 text-white shadow-emerald-400/60 ring-emerald-100',
   wrong:
@@ -26,9 +34,19 @@ const stateClass: Record<OptionVisualState, string> = {
   hint: 'bg-gradient-to-br from-yellow-300 to-amber-400 text-white shadow-amber-400/60 ring-white',
 };
 
-export function OptionButton({ option, state, onSelect }: OptionButtonProps) {
+export function OptionButton({
+  option,
+  state,
+  paletteIndex = 0,
+  visualEmoji = '✦',
+  onSelect,
+}: OptionButtonProps) {
   const disabled = state === 'disabled';
   const isIdle = state === 'idle' || state === 'hint';
+  const visualClass =
+    state === 'idle'
+      ? `bg-gradient-to-br ${IDLE_PALETTE[paletteIndex % IDLE_PALETTE.length]} text-white ring-white`
+      : stateClass[state];
 
   return (
     <motion.button
@@ -40,16 +58,16 @@ export function OptionButton({ option, state, onSelect }: OptionButtonProps) {
         state === 'wrong'
           ? { x: [-12, 12, -12, 12, 0] }
           : state === 'correct'
-            ? { scale: [1, 1.2, 1], rotate: [0, -5, 5, 0] }
+            ? { scale: [1, 1.18, 1], rotate: [0, -3, 2, 0] }
             : { x: 0, scale: 1 }
       }
-      transition={SPRING.bounce}
+      transition={state === 'correct' ? SPRING.celebrate : SPRING.bounce}
       disabled={disabled}
       onClick={() => onSelect(option)}
-      className={`ipad-option-button relative flex h-28 flex-col items-center justify-center gap-1 rounded-3xl px-8 py-5 shadow-xl ring-2 md:h-36 ${stateClass[state]}`}
+      className={`ipad-option-button relative flex h-32 flex-col items-center justify-center gap-1 rounded-3xl px-8 py-5 shadow-xl ring-2 md:h-44 ${visualClass}`}
     >
       <span className="text-2xl drop-shadow-md" aria-hidden="true">
-        🍎
+        {visualEmoji}
       </span>
       <span className="text-5xl font-black text-white drop-shadow-[0_2px_0_rgba(0,0,0,0.15)] md:text-6xl">
         {option.label}

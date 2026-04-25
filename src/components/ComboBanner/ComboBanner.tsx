@@ -54,7 +54,7 @@ export function ComboBanner({ combo }: ComboBannerProps) {
           }}
           exit={{ opacity: 0, scale: 0.7 }}
           transition={{ duration: 1.8, times: [0, 0.3, 0.7, 1] }}
-          className={`pointer-events-none fixed left-[48%] top-[38svh] z-40 max-w-[calc(100vw-3rem)] -translate-x-1/2 -translate-y-1/2 whitespace-normal bg-gradient-to-r bg-clip-text text-center font-black leading-none tracking-wide text-transparent drop-shadow-[0_4px_0_rgba(255,255,255,0.9)] md:top-[35svh] ${cfg.size} ${cfg.gradient}`}
+          className={`pointer-events-none fixed left-[48%] top-[25svh] z-40 max-w-[calc(100vw-3rem)] -translate-x-1/2 -translate-y-1/2 whitespace-normal bg-gradient-to-r bg-clip-text text-center font-black leading-none tracking-wide text-transparent drop-shadow-[0_4px_0_rgba(255,255,255,0.9)] md:top-[25svh] ${cfg.size} ${cfg.gradient}`}
           style={{
             WebkitTextStroke: '3px white',
             textShadow: '6px 6px 0 rgba(0,0,0,0.1)',
