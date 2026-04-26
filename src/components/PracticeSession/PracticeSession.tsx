@@ -11,6 +11,12 @@ interface PracticeSessionProps {
   question: Question;
   answered: boolean;
   hintStage: number;
+  reasoningState?: {
+    currentStepIndex: number;
+    hintText?: string | null;
+    stepStem: string;
+    totalSteps: number;
+  } | null;
   levelProgress: number;
   levelQuestionGoal: number;
   optionStates: { option: QuestionOption; state: OptionVisualState }[];
@@ -52,6 +58,7 @@ export function PracticeSession({
   question,
   answered,
   hintStage,
+  reasoningState = null,
   levelProgress,
   levelQuestionGoal,
   optionStates,
@@ -72,7 +79,11 @@ export function PracticeSession({
       className="ipad-practice-grid relative z-10 mx-auto grid w-full max-w-7xl gap-5 pb-24"
     >
       <div className="flex min-w-0 flex-col gap-5">
-        <QuestionCard question={question} answered={answered} />
+        <QuestionCard
+          question={question}
+          answered={answered}
+          reasoningState={reasoningState}
+        />
         <HintLadder question={question} stage={hintStage} />
       </div>
 

@@ -16,7 +16,14 @@ import {
   type AppTopBarConfig,
 } from './components/AppTopBar/AppTopBar';
 import { useLearnerProfile } from './ai/useLearnerProfile';
-import { requestProgrammingHint } from './ai/api/childlearnAi';
+import {
+  requestColdStartBaselineAssessment,
+  requestProgrammingHint,
+} from './ai/api/childlearnAi';
+import {
+  buildColdStartBaselinePayload,
+  fallbackBaselineForAge,
+} from './ai/coldStartAgent';
 import { generateQuestion } from './curriculum/questionFactory';
 import {
   DIAGNOSTIC_QUESTION_COUNT,
@@ -166,6 +173,15 @@ function AppRootContent() {
   );
   const [answered, setAnswered] = useState(shouldRestoreAnsweredQuestion);
   const [hintStage, setHintStage] = useState(() => initialAppSnapshot?.hintStage ?? 0);
+  const [reasoningStepIndex, setReasoningStepIndex] = useState(
+    () => initialAppSnapshot?.reasoningStepIndex ?? 0,
+  );
+  const [reasoningStepAttempts, setReasoningStepAttempts] = useState<number[]>(
+    () => initialAppSnapshot?.reasoningStepAttempts ?? [],
+  );
+  const [reasoningVisibleHint, setReasoningVisibleHint] = useState<string | null>(
+    () => initialAppSnapshot?.reasoningVisibleHint ?? null,
+  );
   const [stats, setStats] = useState<SessionStats>(readStoredStats);
   const [levelQuestionGoal, setLevelQuestionGoal] = useState(
     () => initialAppSnapshot?.levelQuestionGoal ?? DEFAULT_LEVEL_QUESTION_GOAL,
@@ -221,6 +237,7 @@ function AppRootContent() {
   const practiceRunIdRef = useRef<string | null>(
     initialAppSnapshot?.practiceRunId ?? null,
   );
+  const pendingAttemptRecordOverrideRef = useRef<Partial<QuestionAttemptRecord> | null>(null);
   const selectedLiteracyItem = useMemo(
     () => findLiteracyItemById(selectedLiteracyId) ?? DEFAULT_LITERACY_ITEM,
     [selectedLiteracyId],
@@ -287,11 +304,13 @@ function AppRootContent() {
     closeParentReport,
     handleOpenParentGate,
     handleParentGateSuccess,
+    parentFeedback,
     parentGateOpen,
     parentReportOpen,
     parentSummary,
     parentSummaryStatus,
     privacyHref,
+    submitParentFeedback,
     setParentReportOpen,
   } = useParentAccess({
     difficulty: dda.difficulty,
@@ -330,6 +349,22 @@ function AppRootContent() {
     scene,
     selectedOptionId,
   });
+
+  const resetReasoningProgress = useCallback(() => {
+    pendingAttemptRecordOverrideRef.current = null;
+    setReasoningStepIndex(0);
+    setReasoningStepAttempts([]);
+    setReasoningVisibleHint(null);
+  }, []);
+
+  const reasoningSteps = useMemo(
+    () => (question.reasoning?.kind === 'multiStep' ? question.reasoning.steps ?? [] : []),
+    [question],
+  );
+  const activeReasoningStep = reasoningSteps[reasoningStepIndex] ?? null;
+  const activeAnswerOptions = activeReasoningStep?.choices ?? question.options;
+  const activeAnswerValue =
+    activeReasoningStep?.choices[activeReasoningStep.correctIndex]?.value ?? question.answer;
 
   useEffect(() => {
     reviewQueueRef.current = reviewQueue;
@@ -432,6 +467,7 @@ function AppRootContent() {
       setQuestionIndex(nextIndex);
       setQuestion(next);
       beginQuestionTelemetry(next, nextIndex);
+      resetReasoningProgress();
       setSelectedOptionId(null);
       setFeedback(null);
       setAnswered(false);
@@ -447,6 +483,7 @@ function AppRootContent() {
       loadAdaptiveQuestion,
       questionIndex,
       readQuestionAfterDelay,
+      resetReasoningProgress,
     ],
   );
 
@@ -461,6 +498,11 @@ function AppRootContent() {
       feedback: answered ? feedback : null,
       answered,
       hintStage,
+      reasoningStepIndex: question.reasoning?.kind === 'multiStep' ? reasoningStepIndex : 0,
+      reasoningStepAttempts:
+        question.reasoning?.kind === 'multiStep' ? reasoningStepAttempts : [],
+      reasoningVisibleHint:
+        question.reasoning?.kind === 'multiStep' ? reasoningVisibleHint : null,
       levelQuestionGoal,
       levelProgress,
       levelMistakes,
@@ -495,6 +537,9 @@ function AppRootContent() {
     flowShadowPolicy,
     flowShadowReport,
     hintStage,
+    reasoningStepAttempts,
+    reasoningStepIndex,
+    reasoningVisibleHint,
     lastResult,
     levelBestCombo,
     levelLatestSticker,
@@ -531,6 +576,7 @@ function AppRootContent() {
       }
 
       restoredAnsweredQuestionRef.current = false;
+      resetReasoningProgress();
       setSelectedOptionId(null);
       setFeedback(null);
       setAnswered(false);
@@ -551,6 +597,7 @@ function AppRootContent() {
     levelProgress,
     levelQuestionGoal,
     nextQuestion,
+    resetReasoningProgress,
     scene,
     waitFor,
   ]);
@@ -560,7 +607,10 @@ function AppRootContent() {
     const runId = createClientId('run');
     const startingPolicy = flowShadowPolicy;
     const startingPolicyBatchId = flowShadowReport?.batchId ?? null;
-    const shouldRunDiagnostic = !readDiagnosticSnapshot();
+    const hasLearnerEvidence = Object.values(learner.profile.skills).some(
+      (skill) => skill.attempts > 0,
+    );
+    const shouldRunDiagnostic = !readDiagnosticSnapshot() && !hasLearnerEvidence;
     const runMode: PracticeRunMode = shouldRunDiagnostic ? 'diagnostic' : 'level';
     const diagnosticSeed = shouldRunDiagnostic ? createDiagnosticRunSeed() : null;
     const difficulty = startingPolicy?.nextDifficulty ?? dda.difficulty;
@@ -587,6 +637,7 @@ function AppRootContent() {
       dda.applyDifficulty(difficulty);
     }
     setQuestionIndex(0);
+    resetReasoningProgress();
     setSelectedOptionId(null);
     setFeedback(null);
     setAnswered(false);
@@ -660,10 +711,12 @@ function AppRootContent() {
     flowShadowReport?.batchId,
     flowShadowPolicy,
     isCurrentFlow,
+    learner.profile.skills,
     loadAdaptiveQuestion,
     readQuestionAfterDelay,
     speak,
     stop,
+    resetReasoningProgress,
   ]);
 
   const {
@@ -789,7 +842,7 @@ function AppRootContent() {
   });
 
   const completeDiagnosticRun = useCallback(
-    ({
+    async ({
       records,
       mistakes,
       maxCombo,
@@ -802,30 +855,42 @@ function AppRootContent() {
       latestSticker: Sticker | null;
       newSpirits: NumberSpirit[];
     }) => {
-      const score = scoreDiagnosticAttempts(records);
+      const fallbackScore = scoreDiagnosticAttempts(records);
+      const baselineAssessment =
+        (await requestColdStartBaselineAssessment(
+          buildColdStartBaselinePayload({
+            ageMonths: 60,
+            records,
+          }),
+        )) ?? fallbackBaselineForAge(60);
+      learner.applyBaseline(baselineAssessment);
+      const recommendedDifficulty =
+        baselineAssessment.recommendedDifficulty ?? fallbackScore.recommendedDifficulty;
       writeDiagnosticSnapshot({
         schemaVersion: 1,
         completedAt: Date.now(),
-        recommendedDifficulty: score.recommendedDifficulty,
-        correctCount: score.correctCount,
-        firstTryCorrectCount: score.firstTryCorrectCount,
+        recommendedDifficulty,
+        correctCount: fallbackScore.correctCount,
+        firstTryCorrectCount: fallbackScore.firstTryCorrectCount,
+        baselineConfidence: baselineAssessment.confidence,
+        recommendedSkill: baselineAssessment.nextSkill ?? null,
         runSeed: diagnosticRunSeedRef.current ?? undefined,
       });
-      dda.applyDiagnosticResult(score.recommendedDifficulty);
+      dda.applyDiagnosticResult(recommendedDifficulty);
       const gardenReward = rewardGarden.claimLevelCompletion({
-        correct: score.correctCount,
+        correct: fallbackScore.correctCount,
         total: DIAGNOSTIC_QUESTION_COUNT,
         mistakes,
         maxCombo,
       });
       const result: LevelResultSnapshot = {
-        correct: score.correctCount,
+        correct: fallbackScore.correctCount,
         total: DIAGNOSTIC_QUESTION_COUNT,
         mistakes,
         maxCombo,
         starsEarned: 0,
         rankName: rank.rank.name,
-        difficulty: score.recommendedDifficulty,
+        difficulty: recommendedDifficulty,
         sticker: latestSticker,
         gardenReward,
         newSpirits,
@@ -836,19 +901,22 @@ function AppRootContent() {
       combo.endRun();
       setLevelStarsEarned(0);
       setLastResult(result);
+      resetReasoningProgress();
       setFeedback(null);
       setAnswered(false);
       setSelectedOptionId(null);
       setScene('result');
       track('diagnostic.complete', {
         runId: practiceRunIdRef.current,
-        correct: score.correctCount,
-        firstTryCorrect: score.firstTryCorrectCount,
-        recommendedDifficulty: score.recommendedDifficulty,
-        readiness: score.readinessLabel,
+        baselineConfidence: baselineAssessment.confidence,
+        correct: fallbackScore.correctCount,
+        firstTryCorrect: fallbackScore.firstTryCorrectCount,
+        nextSkill: baselineAssessment.nextSkill ?? null,
+        recommendedDifficulty,
+        readiness: fallbackScore.readinessLabel,
       });
     },
-    [combo, dda, rank.rank.name, rewardGarden],
+    [combo, dda, learner, rank.rank.name, resetReasoningProgress, rewardGarden],
   );
 
   const completeLevelRun = useCallback(
@@ -908,6 +976,7 @@ function AppRootContent() {
       combo.endRun();
       setLevelStarsEarned(rankStarsAwarded);
       setLastResult(result);
+      resetReasoningProgress();
       setFeedback(null);
       setAnswered(false);
       setSelectedOptionId(null);
@@ -931,7 +1000,7 @@ function AppRootContent() {
         maxCombo,
       });
     },
-    [combo, createFlowShadowPolicy, levelQuestionGoal, rank, rewardGarden],
+    [combo, createFlowShadowPolicy, levelQuestionGoal, rank, resetReasoningProgress, rewardGarden],
   );
 
   const handleSelect = useCallback(
@@ -955,17 +1024,141 @@ function AppRootContent() {
         return;
       }
 
-      const isCorrect = option.value === question.answer;
+      const currentReasoningStep = activeReasoningStep;
+      const currentReasoningCorrectOption =
+        currentReasoningStep?.choices[currentReasoningStep.correctIndex] ?? null;
+      const isMultiStepQuestion = Boolean(
+        currentReasoningStep &&
+          currentReasoningCorrectOption &&
+          question.reasoning?.kind === 'multiStep',
+      );
+      const isCorrect = isMultiStepQuestion
+        ? option.id === currentReasoningCorrectOption?.id
+        : option.value === question.answer;
       const isDiagnosticRun = currentRunModeRef.current === 'diagnostic';
       const nextHintStage = isCorrect ? hintStage : Math.min(hintStage + 1, 3);
       const attemptTelemetry = recordAnswerAttempt(question, option, nextHintStage);
+      const nextStepAttempts = [...reasoningStepAttempts];
+      if (isMultiStepQuestion) {
+        nextStepAttempts[reasoningStepIndex] = (nextStepAttempts[reasoningStepIndex] ?? 0) + 1;
+      }
       setSelectedOptionId(option.id);
+
+      if (isMultiStepQuestion && currentReasoningStep && currentReasoningCorrectOption) {
+        setReasoningStepAttempts(nextStepAttempts);
+        track(
+          'question.answer',
+          questionEventPayload(question, questionIndex, {
+            selectedValue: option.value,
+            answerValue: currentReasoningCorrectOption.value,
+            correct: isCorrect,
+            attemptCount: attemptTelemetry?.attemptCount ?? null,
+            firstResponseTimeMs: attemptTelemetry?.firstResponseTimeMs ?? null,
+            elapsedMs: attemptTelemetry ? Date.now() - attemptTelemetry.startedAtMs : null,
+            hintsUsed: nextHintStage,
+            audioReplayCount: attemptTelemetry?.audioReplayCount ?? null,
+            reasoningStepIndex,
+            reasoningStepLabel: currentReasoningStep.stepId,
+          }),
+        );
+
+        if (!isCorrect) {
+          const flowId = beginFlow();
+          if (!isDiagnosticRun) {
+            combo.miss();
+            dda.onWrong(deriveQuestionDifficultyTags(question));
+          }
+          const nextLevelMistakes = levelMistakes + 1;
+          const promptLine =
+            currentReasoningStep.hintOnWrong
+              ? buildProgrammingVoiceLine(currentReasoningStep.hintOnWrong)
+              : buildHintVoiceLine(question, nextHintStage);
+          pendingAttemptRecordOverrideRef.current = null;
+          setLevelMistakes(nextLevelMistakes);
+          setHintStage(nextHintStage);
+          setReasoningVisibleHint(currentReasoningStep.hintOnWrong ?? null);
+          setFeedback('wrong');
+          setReviewQueue((queue) => {
+            const nextQueue = addReviewItem(queue, question);
+            reviewQueueRef.current = nextQueue;
+            return nextQueue;
+          });
+          playTryAgainFeedback();
+          track(
+            'question.reasoning_step_feedback',
+            questionEventPayload(question, questionIndex, {
+              outcome: 'wrong_step',
+              hintStage: nextHintStage,
+              reasoningStepIndex,
+              reasoningStepLabel: currentReasoningStep.stepId,
+            }),
+          );
+          void speak(promptLine);
+          const feedbackDelay = Math.max(
+            WRONG_FEEDBACK_MIN_MS,
+            estimateVoiceLineDurationMs(promptLine),
+          );
+          void waitFor(feedbackDelay).then(() => {
+            if (!isCurrentFlow(flowId)) {
+              return;
+            }
+
+            setSelectedOptionId(null);
+            setFeedback(null);
+          });
+          return;
+        }
+
+        const isLastReasoningStep = reasoningStepIndex >= reasoningSteps.length - 1;
+        if (!isLastReasoningStep) {
+          const flowId = beginFlow();
+          const stepLine = buildProgrammingVoiceLine(
+            currentReasoningStep.stepId === 'split' ? '对啦，先凑到十。' : '对啦，再走一步。',
+          );
+          setReasoningVisibleHint(null);
+          setFeedback('correct');
+          track(
+            'question.reasoning_step_feedback',
+            questionEventPayload(question, questionIndex, {
+              outcome: 'correct_step',
+              reasoningStepIndex,
+              reasoningStepLabel: currentReasoningStep.stepId,
+            }),
+          );
+          playPositiveFeedback('correct');
+          void speak(stepLine);
+          const feedbackDelay = Math.max(900, estimateVoiceLineDurationMs(stepLine));
+          void waitFor(feedbackDelay).then(() => {
+            if (!isCurrentFlow(flowId)) {
+              return;
+            }
+
+            setReasoningStepIndex((previous) => previous + 1);
+            setSelectedOptionId(null);
+            setFeedback(null);
+          });
+          return;
+        }
+
+        pendingAttemptRecordOverrideRef.current = {
+          firstAttemptCorrect: nextStepAttempts.every((count) => count === 1),
+          strategyUse: {
+            attemptedStrategy: question.reasoning?.strategy ?? 'direct',
+            stepsCorrect: nextStepAttempts.map((count) => count === 1),
+            totalSteps: reasoningSteps.length,
+          },
+        };
+        setReasoningVisibleHint(null);
+      }
+
       if (!isDiagnosticRun) {
         setStats((previous) => {
           const next = {
             attempted: previous.attempted + 1,
             correct: previous.correct + (isCorrect ? 1 : 0),
-            hintsUsed: previous.hintsUsed + (isCorrect ? 0 : 1),
+            hintsUsed:
+              previous.hintsUsed +
+              (isMultiStepQuestion ? (nextHintStage > 0 ? 1 : 0) : isCorrect ? 0 : 1),
           };
           writeStoredStats(next);
           return next;
@@ -976,7 +1169,7 @@ function AppRootContent() {
         'question.answer',
         questionEventPayload(question, questionIndex, {
           selectedValue: option.value,
-          answerValue: question.answer,
+          answerValue: activeAnswerValue,
           correct: isCorrect,
           attemptCount: attemptTelemetry?.attemptCount ?? null,
           firstResponseTimeMs: attemptTelemetry?.firstResponseTimeMs ?? null,
@@ -997,7 +1190,12 @@ function AppRootContent() {
           reviewQueueRef.current = nextQueue;
           return nextQueue;
         });
-        const completedAttemptRecord = createCompletedAttemptRecord(question, option);
+        const completedAttemptRecord = createCompletedAttemptRecord(
+          question,
+          option,
+          pendingAttemptRecordOverrideRef.current ?? {},
+        );
+        pendingAttemptRecordOverrideRef.current = null;
         track(
           'question.completed',
           questionEventPayload(question, questionIndex, {
@@ -1137,7 +1335,7 @@ function AppRootContent() {
 
           if (nextLevelProgress >= levelQuestionGoal) {
             if (currentRunModeRef.current === 'diagnostic') {
-              completeDiagnosticRun({
+              void completeDiagnosticRun({
                 records: nextAttemptRecords,
                 mistakes: levelMistakes,
                 maxCombo: nextLevelBestCombo,
@@ -1205,7 +1403,12 @@ function AppRootContent() {
       );
 
       if (shouldFinalizeWrong) {
-        const completedAttemptRecord = createCompletedAttemptRecord(question, option);
+        const completedAttemptRecord = createCompletedAttemptRecord(
+          question,
+          option,
+          pendingAttemptRecordOverrideRef.current ?? {},
+        );
+        pendingAttemptRecordOverrideRef.current = null;
         track(
           'question.completed',
           questionEventPayload(question, questionIndex, {
@@ -1283,7 +1486,7 @@ function AppRootContent() {
 
           if (nextLevelProgress >= levelQuestionGoal) {
             if (currentRunModeRef.current === 'diagnostic') {
-              completeDiagnosticRun({
+              void completeDiagnosticRun({
                 records: nextAttemptRecords,
                 mistakes: nextLevelMistakes,
                 maxCombo: levelBestCombo,
@@ -1359,11 +1562,16 @@ function AppRootContent() {
       maybeCreateInterimFlowPolicy,
       nextQuestion,
       numberSpirits,
+      activeAnswerValue,
+      activeReasoningStep,
       question,
       questionEventPayload,
       questionIndex,
       rank,
       recordAnswerAttempt,
+      reasoningStepAttempts,
+      reasoningStepIndex,
+      reasoningSteps,
       rewardGarden,
       scene,
       selectedOptionId,
@@ -1378,17 +1586,33 @@ function AppRootContent() {
 
   const optionStates = useMemo(
     () =>
-      question.options.map((option) => ({
+      activeAnswerOptions.map((option) => ({
         option,
         state: getOptionState({
           option,
-          question,
+          question: {
+            ...question,
+            answer: activeAnswerValue,
+            options: activeAnswerOptions,
+          },
           selectedOptionId,
           answered,
           hintStage,
         }),
       })),
-    [answered, hintStage, question, selectedOptionId],
+    [activeAnswerOptions, activeAnswerValue, answered, hintStage, question, selectedOptionId],
+  );
+  const practiceReasoningState = useMemo(
+    () =>
+      activeReasoningStep
+        ? {
+            currentStepIndex: reasoningStepIndex,
+            hintText: reasoningVisibleHint,
+            stepStem: activeReasoningStep.stem,
+            totalSteps: reasoningSteps.length,
+          }
+        : null,
+    [activeReasoningStep, reasoningStepIndex, reasoningSteps.length, reasoningVisibleHint],
   );
   const homeSceneProps = useMemo(
     () => ({
@@ -1500,6 +1724,7 @@ function AppRootContent() {
       question,
       answered,
       hintStage,
+      reasoningState: practiceReasoningState,
       levelProgress,
       levelQuestionGoal,
       optionStates,
@@ -1518,6 +1743,7 @@ function AppRootContent() {
       levelProgress,
       levelQuestionGoal,
       optionStates,
+      practiceReasoningState,
       question,
       rank.rank.name,
       rank.rank.starLabel,
@@ -1689,6 +1915,7 @@ function AppRootContent() {
         open={parentReportOpen}
         onClose={closeParentReport}
         onRestartDiagnostic={handleRestartDiagnostic}
+        onSelectParentFeedback={submitParentFeedback}
         correct={stats.correct}
         attempted={stats.attempted}
         maxCombo={combo.maxEver}
@@ -1706,6 +1933,7 @@ function AppRootContent() {
         flowObserverReason={flowObservation?.stateReason ?? null}
         flowObserverIssue={flowObservation?.primaryIssue ?? null}
         learnerProfile={learner.profile}
+        parentFeedback={parentFeedback}
         parentSummary={parentSummary}
         parentSummaryStatus={parentSummaryStatus}
         privacyHref={privacyHref}

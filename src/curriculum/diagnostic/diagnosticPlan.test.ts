@@ -5,12 +5,12 @@ import {
 } from './diagnosticPlan';
 
 describe('diagnosticPlan', () => {
-  it('keeps a three-question diagnostic run', () => {
+  it('keeps a five-question diagnostic run', () => {
     const questions = Array.from({ length: DIAGNOSTIC_QUESTION_COUNT }, (_, serial) =>
       getDiagnosticQuestion(serial, 1001),
     );
 
-    expect(questions).toHaveLength(3);
+    expect(questions).toHaveLength(5);
     expect(questions.every((question) => question.id.startsWith('diagnostic-'))).toBe(true);
   });
 

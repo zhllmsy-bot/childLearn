@@ -3,7 +3,7 @@ import { generateQuestion } from '../questionFactory';
 import type { Question, QuestionVariant } from '../types';
 
 export const DIAGNOSTIC_STORAGE_KEY = 'childlearn.diagnostic-v1';
-export const DIAGNOSTIC_QUESTION_COUNT = 3;
+export const DIAGNOSTIC_QUESTION_COUNT = 5;
 
 interface DiagnosticQuestionPlan {
   variant: QuestionVariant;
@@ -18,13 +18,17 @@ export interface DiagnosticSnapshot {
   recommendedDifficulty: number;
   correctCount: number;
   firstTryCorrectCount: number;
+  baselineConfidence?: number;
+  recommendedSkill?: string | null;
   runSeed?: number;
 }
 
 const DIAGNOSTIC_PLAN: DiagnosticQuestionPlan[] = [
-  { variant: 'numberLine', difficulty: 3, serial: 0, skill: 'numberLineDistance' },
-  { variant: 'compare', difficulty: 2, serial: 1, skill: 'compareWithin5' },
-  { variant: 'makeTen', difficulty: 4, serial: 2, skill: 'makeTen' },
+  { variant: 'matching', difficulty: 3, serial: 0, skill: 'countingTo10' },
+  { variant: 'compare', difficulty: 4, serial: 1, skill: 'compareWithin10' },
+  { variant: 'makeTen', difficulty: 5, serial: 2, skill: 'makeTen' },
+  { variant: 'missing', difficulty: 5, serial: 3, skill: 'missingAddend' },
+  { variant: 'numberLine', difficulty: 4, serial: 4, skill: 'numberLineDistance' },
 ];
 
 function normalizeSeed(seed: number) {
@@ -101,10 +105,15 @@ export function readDiagnosticSnapshot(): DiagnosticSnapshot | null {
         10,
       ),
       correctCount: Math.max(0, Math.round(Number(parsed.correctCount ?? 0))),
-    firstTryCorrectCount: Math.max(
+      firstTryCorrectCount: Math.max(
         0,
         Math.round(Number(parsed.firstTryCorrectCount ?? 0)),
       ),
+      baselineConfidence: Number.isFinite(Number(parsed.baselineConfidence))
+        ? Math.min(Math.max(Number(parsed.baselineConfidence), 0), 1)
+        : undefined,
+      recommendedSkill:
+        typeof parsed.recommendedSkill === 'string' ? parsed.recommendedSkill : null,
       runSeed: Number.isFinite(Number(parsed.runSeed))
         ? normalizeSeed(Number(parsed.runSeed))
         : undefined,

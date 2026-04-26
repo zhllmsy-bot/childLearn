@@ -42,9 +42,15 @@ function record(overrides: Partial<QuestionAttemptRecord>): QuestionAttemptRecor
 
 describe('scoreDiagnosticAttempts', () => {
   it('places fluent diagnostic runs at a higher start difficulty', () => {
-    const score = scoreDiagnosticAttempts([record({}), record({}), record({})]);
+    const score = scoreDiagnosticAttempts([
+      record({}),
+      record({}),
+      record({}),
+      record({}),
+      record({ hintCount: 1 }),
+    ]);
 
-    expect(score.recommendedDifficulty).toBe(5);
+    expect(score.recommendedDifficulty).toBe(6);
     expect(score.readinessLabel).toBe('challenge');
   });
 
@@ -53,9 +59,11 @@ describe('scoreDiagnosticAttempts', () => {
       record({ firstAttemptCorrect: false, hintCount: 1 }),
       record({ firstAttemptCorrect: false, finalCorrect: false, hintCount: 2 }),
       record({ firstAttemptCorrect: false, finalCorrect: false, hintCount: 2 }),
+      record({ firstAttemptCorrect: false, finalCorrect: false, hintCount: 2 }),
+      record({ firstAttemptCorrect: false, finalCorrect: false, hintCount: 2 }),
     ]);
 
-    expect(score.recommendedDifficulty).toBe(1);
+    expect(score.recommendedDifficulty).toBe(2);
     expect(score.readinessLabel).toBe('support');
   });
 });

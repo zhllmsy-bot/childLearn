@@ -115,6 +115,9 @@ export interface StoredAppSnapshot {
   feedback: FeedbackLevel | null;
   answered: boolean;
   hintStage: number;
+  reasoningStepIndex?: number;
+  reasoningStepAttempts?: number[];
+  reasoningVisibleHint?: string | null;
   levelQuestionGoal: number;
   levelProgress: number;
   levelMistakes: number;
@@ -240,6 +243,19 @@ export function readStoredAppSnapshot(): StoredAppSnapshot | null {
       hintStage: Number.isFinite(Number(parsed.hintStage))
         ? Math.min(Math.max(Math.round(Number(parsed.hintStage)), 0), 3)
         : 0,
+      reasoningStepIndex: Number.isFinite(Number(parsed.reasoningStepIndex))
+        ? Math.max(0, Math.round(Number(parsed.reasoningStepIndex)))
+        : 0,
+      reasoningStepAttempts: Array.isArray(parsed.reasoningStepAttempts)
+        ? parsed.reasoningStepAttempts
+            .map((value) => Math.max(0, Math.round(Number(value))))
+            .filter((value) => Number.isFinite(value))
+            .slice(0, 4)
+        : [],
+      reasoningVisibleHint:
+        typeof parsed.reasoningVisibleHint === 'string'
+          ? parsed.reasoningVisibleHint
+          : null,
       levelQuestionGoal: Number.isFinite(Number(parsed.levelQuestionGoal))
         ? Math.max(1, Math.round(Number(parsed.levelQuestionGoal)))
         : DEFAULT_LEVEL_QUESTION_GOAL,

@@ -17,6 +17,18 @@ const WINDOW_SIZE = 10;
 const SKILL_WINDOW_SIZE = 6;
 const MIN_WINDOW_FOR_ADJUSTMENT = 5;
 
+function raiseStepForStreak(consecutiveCorrect: number) {
+  if (consecutiveCorrect >= 5) {
+    return 3;
+  }
+
+  if (consecutiveCorrect >= 4) {
+    return 2;
+  }
+
+  return 1;
+}
+
 export const INITIAL_DDA_STATE: DdaState = {
   difficulty: 1,
   consecutiveCorrect: 0,
@@ -100,8 +112,9 @@ export function nextDdaState(
       (skillAccuracy === null || skillAccuracy >= 0.75);
 
     if (shouldRaise) {
+      const raiseStep = raiseStepForStreak(consecutiveCorrect);
       return {
-        difficulty: Math.min(state.difficulty + 1, 10),
+        difficulty: Math.min(state.difficulty + raiseStep, 10),
         consecutiveCorrect: 0,
         consecutiveWrong: 0,
         recentWindow,

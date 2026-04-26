@@ -16,6 +16,12 @@ import { Badge } from '../_primitives/Badge';
 interface QuestionCardProps {
   question: Question;
   answered: boolean;
+  reasoningState?: {
+    currentStepIndex: number;
+    hintText?: string | null;
+    stepStem: string;
+    totalSteps: number;
+  } | null;
 }
 
 const VARIANT_LABEL = {
@@ -325,6 +331,29 @@ function BarModelView({ question }: { question: Question }) {
   );
 }
 
+function MakeTenBridgeView({ question }: { question: Question }) {
+  const [first = 0, second = 0] = question.barModel;
+  const bridge = first < 10 ? Math.min(Math.max(10 - first, 0), second) : 0;
+  const leftover = Math.max(second - bridge, 0);
+
+  return (
+    <div className="w-full max-w-xl space-y-3 rounded-3xl bg-white/60 p-4 shadow-xl shadow-emerald-500/20 ring-2 ring-white">
+      <SegmentedBar label="先有" count={first} max={10} tone="emerald" showTicks />
+      <SegmentedBar label="再来" count={second} max={10} tone="amber" />
+      <div className="grid gap-2 md:grid-cols-2">
+        <div className="rounded-2xl bg-emerald-50/90 px-4 py-3 text-left shadow-lg shadow-emerald-500/10 ring-2 ring-white">
+          <div className="text-sm font-black text-emerald-900/65">先凑到 10</div>
+          <div className="mt-1 text-2xl font-black text-emerald-950">{bridge}</div>
+        </div>
+        <div className="rounded-2xl bg-amber-50/90 px-4 py-3 text-left shadow-lg shadow-amber-500/10 ring-2 ring-white">
+          <div className="text-sm font-black text-amber-900/70">还剩下</div>
+          <div className="mt-1 text-2xl font-black text-amber-950">{leftover}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NumberLineView({ question }: { question: Question }) {
   if (!question.numberLine) {
     return null;
@@ -358,6 +387,10 @@ function NumberLineView({ question }: { question: Question }) {
 }
 
 function LearningRepresentation({ question }: { question: Question }) {
+  if (question.reasoning?.kind === 'multiStep' && question.reasoning.strategy === 'makeTen') {
+    return <MakeTenBridgeView question={question} />;
+  }
+
   if (question.variant === 'numberLine') {
     return <NumberLineView question={question} />;
   }
@@ -383,7 +416,47 @@ function LearningRepresentation({ question }: { question: Question }) {
   return <BarModelView question={question} />;
 }
 
-function QuestionCardComponent({ question, answered }: QuestionCardProps) {
+function ReasoningPanel({
+  reasoningState,
+}: {
+  reasoningState: NonNullable<QuestionCardProps['reasoningState']>;
+}) {
+  return (
+    <div className="w-full max-w-3xl rounded-3xl bg-white/72 p-4 text-left shadow-xl shadow-amber-500/10 ring-2 ring-white md:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-base font-black text-emerald-950/70 md:text-lg">
+        <span>凑十小步骤</span>
+        <span>
+          {reasoningState.currentStepIndex + 1}/{reasoningState.totalSteps}
+        </span>
+      </div>
+      <div
+        className="mt-3 grid gap-2"
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(reasoningState.totalSteps, 1)}, minmax(0, 1fr))`,
+        }}
+      >
+        {Array.from({ length: reasoningState.totalSteps }, (_, index) => (
+          <span
+            key={index}
+            className={`h-3 rounded-full ring-1 ring-white ${
+              index <= reasoningState.currentStepIndex ? 'bg-child-sun' : 'bg-child-mint'
+            }`}
+          />
+        ))}
+      </div>
+      <p className="mt-4 text-2xl font-black leading-tight text-emerald-950 md:text-3xl">
+        {reasoningState.stepStem}
+      </p>
+      {reasoningState.hintText ? (
+        <p className="mt-4 rounded-2xl bg-orange-100/90 px-4 py-3 text-lg font-black leading-snug text-orange-900 shadow-lg shadow-orange-300/10 ring-2 ring-white/90">
+          {reasoningState.hintText}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function QuestionCardComponent({ question, answered, reasoningState = null }: QuestionCardProps) {
   const reduceMotion = useReducedMotion();
   const shouldCelebrate = answered && !reduceMotion;
 
@@ -428,6 +501,8 @@ function QuestionCardComponent({ question, answered }: QuestionCardProps) {
         <p className="max-w-3xl rounded-full bg-white/70 px-5 py-2 text-lg font-black leading-tight text-emerald-950/80 ring-2 ring-white/80 md:text-2xl">
           {question.prompt}
         </p>
+
+        {reasoningState ? <ReasoningPanel reasoningState={reasoningState} /> : null}
       </motion.div>
     </motion.div>
   );

@@ -1,7 +1,7 @@
 import type { LearnerProfile, LearnerSkillKey } from '../../ai/learnerModel';
 import { chooseLearnerTargetSkill, skillTheta } from '../../ai/learnerModel';
 import type { QuestionVariant } from '../../curriculum/types';
-import type { FlowQuestionLane } from './questionSelector';
+import type { FlowQuestionLane, FlowQuestionReasoningMode } from './questionSelector';
 import { classifyError, type QuestionErrorPattern } from './errorClassifier';
 import { buildRecentFingerprints } from './fingerprint';
 import { detectFatigue } from './fatigueDetector';
@@ -36,6 +36,7 @@ export interface AdaptiveQuestionPayload {
   targetSkillKey?: LearnerSkillKey;
   targetTheta?: number;
   variant?: QuestionVariant;
+  reasoningMode?: FlowQuestionReasoningMode;
   learner: {
     ageMonths: number;
     stage: LearnerStage;
@@ -74,6 +75,7 @@ export interface AdaptiveQuestionPayload {
   recentFingerprints: string[];
   constraints: {
     variant: QuestionVariant;
+    reasoningMode?: FlowQuestionReasoningMode;
     forbiddenPatterns: string[];
     maxChoices: number;
     readingLevel: 'pre-literate';
@@ -89,6 +91,7 @@ export interface BuildAdaptiveQuestionPayloadInput {
   targetSkillKey?: LearnerSkillKey;
   targetTheta?: number;
   variant?: QuestionVariant;
+  reasoningMode?: FlowQuestionReasoningMode;
   childMeta?: {
     ageMonths?: number;
     stage?: LearnerStage;
@@ -98,18 +101,18 @@ export interface BuildAdaptiveQuestionPayloadInput {
 
 function targetOffsetForLane(lane: FlowQuestionLane) {
   if (lane === 'confidence') {
-    return -0.45;
+    return -0.3;
   }
 
   if (lane === 'review') {
-    return -0.15;
+    return -0.1;
   }
 
   if (lane === 'challenge') {
-    return 0.4;
+    return 0.8;
   }
 
-  return 0.2;
+  return 0.5;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -130,6 +133,10 @@ function stageForAge(ageMonths: number): LearnerStage {
   }
 
   return 'pre-k';
+}
+
+function coldStartThetaForAge(ageMonths: number) {
+  return ageMonths >= 54 ? 0.6 : 0.3;
 }
 
 function sessionMinutes(history: QuestionAttemptRecord[]) {
@@ -234,11 +241,13 @@ function buildRecentQuestions(
 }
 
 function buildTarget({
+  ageMonths,
   lane,
   learnerProfile,
   targetSkillKey,
   targetTheta,
 }: {
+  ageMonths: number;
   lane: FlowQuestionLane;
   learnerProfile?: LearnerProfile | null;
   targetSkillKey?: LearnerSkillKey;
@@ -249,7 +258,10 @@ function buildTarget({
     chooseLearnerTargetSkill(learnerProfile, lane) ??
     'countingTo10';
   const flowOffset = targetOffsetForLane(lane);
-  const currentTheta = learnerProfile ? skillTheta(learnerProfile, skillKey) : 0;
+  const seededTheta = coldStartThetaForAge(ageMonths);
+  const skill = learnerProfile?.skills[skillKey];
+  const currentTheta =
+    learnerProfile && skill && skill.attempts > 0 ? skillTheta(learnerProfile, skillKey) : seededTheta;
 
   return {
     skillKey,
@@ -270,12 +282,14 @@ export function buildAdaptiveQuestionPayload({
   targetSkillKey,
   targetTheta,
   variant,
+  reasoningMode,
   childMeta,
   nowMs = Date.now(),
 }: BuildAdaptiveQuestionPayloadInput): AdaptiveQuestionPayload {
   const ageMonths = clamp(Math.round(childMeta?.ageMonths ?? 60), 48, 84);
   const fatigueLevel = detectFatigue(history);
   const target = buildTarget({
+    ageMonths,
     lane,
     learnerProfile,
     targetSkillKey,
@@ -329,6 +343,7 @@ export function buildAdaptiveQuestionPayload({
     recentFingerprints: buildRecentFingerprints(fingerprintSource),
     constraints: {
       variant: variant ?? 'matching',
+      reasoningMode,
       forbiddenPatterns: ['repeat_stem', '>20_result'],
       maxChoices: 4,
       readingLevel: 'pre-literate',

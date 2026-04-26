@@ -27,6 +27,26 @@ export interface QuestionTheme {
   colorHint: string;
 }
 
+export type QuestionReasoningKind = 'single' | 'multiStep' | 'narration';
+
+export type QuestionReasoningStrategy = 'makeTen' | 'doubles' | 'countOn' | 'direct';
+
+export interface QuestionReasoningStep {
+  stepId: string;
+  stem: string;
+  choices: QuestionOption[];
+  correctIndex: number;
+  stepSkillKey: string;
+  hintOnWrong?: string;
+}
+
+export interface QuestionReasoning {
+  kind: QuestionReasoningKind;
+  strategy: QuestionReasoningStrategy;
+  steps?: QuestionReasoningStep[];
+  narrative?: string;
+}
+
 export interface Question {
   id: string;
   level: QuestionLevel;
@@ -50,4 +70,5 @@ export interface Question {
   barModel: number[];
   scaffoldText: string;
   principleText: string;
+  reasoning?: QuestionReasoning;
 }

@@ -154,8 +154,43 @@ describe('selectFlowQuestionPlan', () => {
 
     expect(plan.lane).toBe('challenge');
     expect(plan.targetSkillKey).toBe('makeTen');
+    expect(plan.targetTheta).toBe(0);
     expect(plan.variant).toBe('makeTen');
     expect(plan.difficulty).toBeGreaterThanOrEqual(4);
     expect(plan.difficulty).toBeLessThanOrEqual(6);
+  });
+
+  it('switches cross-ten bridge questions into multi-step mode while the bridge is still shaky', () => {
+    const baseProfile = createEmptyLearnerProfile();
+    const learnerProfile = {
+      ...baseProfile,
+      recommendedSkill: 'crossTenBridge' as const,
+      skills: {
+        ...baseProfile.skills,
+        makeTen: {
+          ...baseProfile.skills.makeTen,
+          theta: 0.7,
+          confidence: 0.7,
+          attempts: 6,
+        },
+        crossTenBridge: {
+          ...baseProfile.skills.crossTenBridge,
+          theta: 0.2,
+          confidence: 0.45,
+          attempts: 4,
+        },
+      },
+    };
+
+    const plan = selectFlowQuestionPlan({
+      learnerProfile,
+      policy: BASE_POLICY,
+      fallbackDifficulty: 4,
+      serial: 3,
+    });
+
+    expect(plan.targetSkillKey).toBe('crossTenBridge');
+    expect(plan.reasoningMode).toBe('multiStep');
+    expect(plan.variant).toBe('makeTen');
   });
 });

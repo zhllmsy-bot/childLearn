@@ -17,7 +17,21 @@ describe('ddaEngine', () => {
       INITIAL_DDA_STATE,
     );
 
-    expect(next.difficulty).toBe(2);
+    expect(next.difficulty).toBe(4);
+    expect(next.consecutiveCorrect).toBe(0);
+    expect(next.recentWindow).toEqual([1, 1, 1, 1, 1]);
+  });
+
+  it('uses a two-step raise when the flow band is cleared on a four-answer streak', () => {
+    const seeded = createState({
+      difficulty: 3,
+      consecutiveCorrect: 3,
+      recentWindow: [1, 1, 1, 1],
+    });
+
+    const next = nextDdaState(seeded, 'correct');
+
+    expect(next.difficulty).toBe(5);
     expect(next.consecutiveCorrect).toBe(0);
     expect(next.recentWindow).toEqual([1, 1, 1, 1, 1]);
   });

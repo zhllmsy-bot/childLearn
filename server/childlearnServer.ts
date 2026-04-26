@@ -1,9 +1,17 @@
 import { getMathProgressionBand } from '../src/curriculum/mathProgression';
 import { buildOptions } from '../src/curriculum/questionFactory';
+import {
+  LEARNER_RADAR_SKILLS,
+  LEARNER_SKILL_KEYS,
+  thetaToDifficulty,
+  type LearnerSkillKey,
+} from '../src/ai/learnerModel';
 import type {
   Question,
   QuestionLevel,
   QuestionOption,
+  QuestionReasoning,
+  QuestionReasoningStep,
   QuestionTheme,
   QuestionVariant,
 } from '../src/curriculum/types';
@@ -13,6 +21,9 @@ type JsonRecord = Record<string, unknown>;
 export type AiAction =
   | 'observe'
   | 'question'
+  | 'cross-ten-question'
+  | 'cold-start-probe'
+  | 'cold-start-assess'
   | 'story-polish'
   | 'programming-hint'
   | 'parent-summary';
@@ -47,7 +58,50 @@ interface AiConfig {
 interface QuestionRequestBody {
   difficulty?: number;
   lane?: string;
+  learner?: {
+    ageMonths?: number;
+    fatigueLevel?: number;
+    flowState?: string;
+    sessionMinutes?: number;
+    slidingAccuracy?: number;
+    stage?: string;
+  };
+  constraints?: {
+    forbiddenPatterns?: string[];
+    maxChoices?: number;
+    readingLevel?: string;
+    reasoningMode?: 'direct' | 'multiStep' | 'narration';
+    variant?: QuestionVariant;
+  };
+  recentFingerprints?: string[];
+  recentQuestions?: Array<{
+    childAnswer?: string;
+    choices?: string[];
+    correctAnswer?: string;
+    errorPattern?: string | null;
+    firstAttemptCorrect?: boolean;
+    hintCount?: number;
+    reactionTimeMs?: number;
+    skillKeys?: string[];
+    stem?: string;
+    thetaAtTime?: number;
+  }>;
+  skillRadar?: Array<{
+    confidence?: number;
+    key?: string;
+    lastSeenMinAgo?: number | null;
+    mastered?: boolean;
+    theta?: number;
+  }>;
   serial?: number;
+  target?: {
+    currentTheta?: number;
+    flowOffset?: number;
+    lane?: string;
+    reasonCode?: string;
+    skillKey?: string;
+    targetTheta?: number;
+  };
   targetSkillKey?: string;
   targetTheta?: number;
   variant?: QuestionVariant;
@@ -65,6 +119,34 @@ interface QuestionRequestBody {
     questionId?: string;
     skillKeys?: string[];
   }>;
+}
+
+interface ColdStartProbeRequestBody {
+  ageMonths?: number;
+  attemptHistory?: Array<{
+    childAnswer?: string;
+    choices?: string[];
+    correctAnswer?: string;
+    errorPattern?: string | null;
+    finalCorrect?: boolean;
+    firstAttemptCorrect?: boolean;
+    hintCount?: number;
+    questionId?: string;
+    questionIndex?: number;
+    reactionTimeMs?: number;
+    result?: string;
+    skillKeys?: string[];
+    stem?: string;
+    thetaAtTime?: number;
+    totalTimeMs?: number;
+  }>;
+  probeIndex?: number;
+  remainingProbes?: number;
+}
+
+interface ColdStartAssessRequestBody {
+  ageMonths?: number;
+  attemptHistory?: ColdStartProbeRequestBody['attemptHistory'];
 }
 
 interface ProgrammingHintRequestBody {
@@ -115,6 +197,9 @@ const DEFAULT_THEME_BY_VARIANT: Record<QuestionVariant, QuestionTheme> = {
 };
 
 const QUESTION_ACTION = '/api/ai?action=question';
+const CROSS_TEN_QUESTION_ACTION = '/api/ai?action=cross-ten-question';
+const COLD_START_PROBE_ACTION = '/api/ai?action=cold-start-probe';
+const COLD_START_ASSESS_ACTION = '/api/ai?action=cold-start-assess';
 const OBSERVE_ACTION = '/api/ai?action=observe';
 const PARENT_SUMMARY_ACTION = '/api/ai?action=parent-summary';
 const PROGRAMMING_HINT_ACTION = '/api/ai?action=programming-hint';
@@ -151,8 +236,60 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function round(value: number, digits = 4) {
+  return Number(value.toFixed(digits));
+}
+
 function compactText(text: string) {
   return text.replace(/\s+/g, ' ').trim();
+}
+
+function compactOptionalText(value: unknown, maxLength: number) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const compacted = compactText(value);
+  return compacted ? compacted.slice(0, maxLength) : null;
+}
+
+function normalizeBoolean(value: unknown, fallback = false) {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function sanitizeStringArray(value: unknown, limit: number, maxLength: number) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .flatMap((item) => {
+      const compacted = compactOptionalText(item, maxLength);
+      return compacted ? [compacted] : [];
+    })
+    .slice(0, limit);
+}
+
+function sanitizeLearnerSkillKeys(value: unknown, limit = 6) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is LearnerSkillKey => typeof item === 'string' && LEARNER_SKILL_KEYS.includes(item as LearnerSkillKey))
+    .slice(0, limit);
+}
+
+function defaultBaselineThetaForAge(ageMonths: number) {
+  if (ageMonths >= 66) {
+    return 0.9;
+  }
+
+  if (ageMonths >= 54) {
+    return 0.6;
+  }
+
+  return 0.3;
 }
 
 function nowMs() {
@@ -173,7 +310,11 @@ function getCached(action: AiAction, body: unknown) {
 
 function setCached(action: AiAction, body: unknown, responseBody: unknown) {
   const ttlMs =
-    action === 'question' || action === 'story-polish'
+    action === 'question' ||
+    action === 'cross-ten-question' ||
+    action === 'story-polish' ||
+    action === 'cold-start-probe' ||
+    action === 'cold-start-assess'
       ? 10 * 60_000
       : action === 'observe'
         ? 20_000
@@ -323,7 +464,7 @@ async function requestStructuredJson(
           max_tokens: 900,
           model,
           system: systemPrompt,
-          temperature: action === 'observe' ? 0 : 0.3,
+          temperature: action === 'observe' || action === 'cold-start-assess' ? 0 : 0.3,
           messages: [
             {
               role: 'user',
@@ -349,7 +490,7 @@ async function requestStructuredJson(
       },
       body: JSON.stringify({
         model,
-        temperature: action === 'observe' ? 0 : 0.35,
+        temperature: action === 'observe' || action === 'cold-start-assess' ? 0 : 0.35,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -380,6 +521,8 @@ Rules:
 - Preserve trust: do not over-claim certainty.
 - Recommend exactly one main adjustment dimension at a time.
 - For young children, language load, UI confusion, or fatigue often explain misses better than skill gaps.
+- When the batch strongly indicates the app is below or above the child's real baseline, you may set profileRefinement.globalDeltaTheta within [-0.5, 0.5].
+- Use globalDeltaTheta sparingly and only when the whole batch trend is clear.
 
 Return one JSON object with:
 overallState, confidence, stateReason, primaryIssue, masteredSkills, weakSkills,
@@ -407,30 +550,219 @@ nextItemSuggestion is optional and must be conservative:
 
 profileRefinement is optional and must stay bounded.`;
 
-const QUESTION_SYSTEM_PROMPT = `You generate one preschool-friendly math question for a 4-6 year old Chinese learner.
+const QUESTION_SYSTEM_PROMPT = `You generate one preschool-friendly math question for a specific 4-6 year old Chinese learner.
+
+You receive:
+- learner snapshot
+- skill radar
+- target difficulty window
+- recent questions with the child's actual answers and reaction times
+- recent fingerprints to avoid repeats
 
 Rules:
 - Output exactly one JSON object.
-- Keep copy short, concrete, warm, and child-safe.
-- Make the difficulty just above comfort, not a big jump.
+- Use simple Chinese only. Keep the copy short, warm, and child-safe.
+- Stay near target.targetTheta. Aim for estimatedTheta within +/-0.15 of target.targetTheta when possible.
 - Respect the requested variant when possible.
-- Use only simple Chinese.
-- Return exactly 4 numeric answer options and include the correct answer.
-- Keep numbers in a range that matches the requested difficulty.
 - Use one clear concept only.
-- Avoid failure language and avoid red-flag framing.
+- Return exactly 4 numeric answer options and include the correct answer.
+- Keep numbers inside the supplied difficulty hints.
+- Avoid repeating stems or the same obvious structure from recent fingerprints.
+- When recent mistakes exist, make at least one distractor reflect that mistake pattern instead of using only random numbers.
+- Avoid failure language and red-flag framing.
 
-Return fields:
-variant, level, factId, prompt, expression, answer, options, objects, comparePair, numberLine, theme, barModel, scaffoldText, principleText.
+Return JSON:
+{
+  "reasoning": {
+    "observedErrorPattern": string,
+    "pickedSkillKey": string,
+    "targetWindow": string,
+    "distractorPlan": string
+  },
+  "confidence": number,
+  "question": {
+    "variant": "matching" | "compare" | "makeTen" | "missing" | "story" | "numberLine",
+    "level": 1 | 2 | 3 | 4 | 5,
+    "factId": string,
+    "prompt": string,
+    "expression": string,
+    "answer": number,
+    "options": [{ "label": string, "value": number }] | [number],
+    "objects": string[],
+    "comparePair": { "left": number, "right": number },
+    "numberLine": { "start": number, "end": number },
+    "theme": { "emoji": string, "colorHint": string },
+    "barModel": number[],
+    "scaffoldText": string,
+    "principleText": string,
+    "estimatedTheta": number
+  }
+}
 
 Constraints:
-- level must be 1..5
-- options must be [{label, value}] or [number]
-- barModel must be a short number array
+- objects should match the visible quantity and stay at or below 20
 - comparePair only for compare
 - numberLine only for numberLine
-- objects should have a length that matches the visible quantity and stay at or below 20
 - theme.colorHint can be a simple token hint like rose, orange, amber, lime, violet, pink`;
+
+const CROSS_TEN_SYSTEM_PROMPT = `You generate one preschool-friendly Chinese make-ten bridge question for a specific 4-6 year old learner.
+
+Goal:
+- Teach the thinking path for crossing 10, not just the final answer.
+- Prefer questions like 6+7, 8+5, 9+4.
+- Use a three-step "split -> make 10 -> combine" flow.
+
+Rules:
+- Output exactly one JSON object.
+- Use simple Chinese only. Keep every sentence short, warm, and child-safe.
+- The whole question should target crossTenBridge and stay near target.targetTheta.
+- Return exactly 4 numeric answer options for the final answer, and 4 short options for step 1.
+- The top-level question answer must be the final total.
+- Order the expression so the first addend is the one being brought to 10 and the second addend is the one being split.
+- reasoning.kind must be "multiStep".
+- reasoning.strategy must be "makeTen".
+- reasoning.steps must contain exactly 3 steps:
+  1. decomposition: choose how to split one addend so the other reaches 10
+  2. make ten: compute the bridge to 10
+  3. combine: compute 10 + the leftover
+- Step 1 choices should use short labels like "4 和 3" and numeric values equal to the part used to make 10.
+- Include one friendly hintOnWrong for each step.
+- Keep stem structures fresh and avoid recent fingerprints when possible.
+
+Return JSON:
+{
+  "confidence": number,
+  "question": {
+    "variant": "makeTen",
+    "level": 1 | 2 | 3 | 4 | 5,
+    "factId": string,
+    "prompt": string,
+    "expression": string,
+    "answer": number,
+    "options": [{ "label": string, "value": number }] | [number],
+    "objects": string[],
+    "theme": { "emoji": string, "colorHint": string },
+    "barModel": number[],
+    "scaffoldText": string,
+    "principleText": string,
+    "estimatedTheta": number,
+    "reasoning": {
+      "kind": "multiStep",
+      "strategy": "makeTen",
+      "narrative": string,
+      "steps": [
+        {
+          "stepId": "split",
+          "stem": string,
+          "choices": [{ "label": string, "value": number }],
+          "correctIndex": number,
+          "stepSkillKey": "decomposition",
+          "hintOnWrong": string
+        },
+        {
+          "stepId": "make-ten",
+          "stem": string,
+          "choices": [{ "label": string, "value": number }],
+          "correctIndex": number,
+          "stepSkillKey": "makeTen",
+          "hintOnWrong": string
+        },
+        {
+          "stepId": "combine",
+          "stem": string,
+          "choices": [{ "label": string, "value": number }],
+          "correctIndex": number,
+          "stepSkillKey": "crossTenBridge",
+          "hintOnWrong": string
+        }
+      ]
+    }
+  },
+  "reasoning": {
+    "pickedNumbers": string,
+    "bridgePlan": string,
+    "stepFocus": string
+  }
+}
+
+Constraints:
+- barModel should contain the two original addends
+- objects should stay at or below 20
+- final answer options should include one off-by-one distractor
+- step 1 should expose the needed bridge part clearly`;
+
+const COLD_START_PROBE_SYSTEM_PROMPT = `You are assessing a 4-6 year old Chinese learner's math starting point in exactly 5 probe questions.
+
+You receive:
+- ageMonths
+- probeIndex and remainingProbes
+- the full previous probe attempt history with stem, choices, child's answer, correctness, error pattern, and reaction time
+
+Strategy:
+- Probe 1 should start around a medium age-appropriate level, not baby-easy.
+- By probe 2, jump up or down enough to bracket the child.
+- By probes 3-4, narrow the estimate.
+- By probe 5, confirm the converged band or test an adjacent key skill.
+- Favor addWithin10, compareWithin10, makeTen, missingAddend, and numberLineDistance.
+
+Rules:
+- Output exactly one JSON object.
+- Use simple Chinese only.
+- Keep the question short, concrete, warm, and child-safe.
+- Return exactly 4 numeric answer options.
+- Avoid repeating the same stem pattern from prior probe history.
+- Include an estimatedTheta that reflects the intended challenge.
+
+Return JSON:
+{
+  "confidence": number,
+  "question": {
+    "variant": "matching" | "compare" | "makeTen" | "missing" | "story" | "numberLine",
+    "level": 1 | 2 | 3 | 4 | 5,
+    "factId": string,
+    "prompt": string,
+    "expression": string,
+    "answer": number,
+    "options": [{ "label": string, "value": number }] | [number],
+    "objects": string[],
+    "comparePair": { "left": number, "right": number },
+    "numberLine": { "start": number, "end": number },
+    "theme": { "emoji": string, "colorHint": string },
+    "barModel": number[],
+    "scaffoldText": string,
+    "principleText": string,
+    "estimatedTheta": number
+  },
+  "reasoning": {
+    "probeGoal": string,
+    "observedSignal": string,
+    "nextBand": string
+  }
+}`;
+
+const COLD_START_ASSESS_SYSTEM_PROMPT = `You review a 5-question cold-start probe for a 4-6 year old Chinese learner and estimate the baseline ability profile.
+
+Rules:
+- Output exactly one JSON object.
+- Use only the supplied attempt history as evidence.
+- Return baselineTheta for every listed skill key.
+- Keep all theta values conservative and bounded to [-1.5, 2.5].
+- If evidence is thin for a skill, interpolate from nearby skills and age rather than leaving it blank.
+- recommendedDifficulty should match the overall baseline and stay within 1..10.
+- nextSkill should be the single best target to stabilize after cold start.
+
+Required skill keys:
+${LEARNER_SKILL_KEYS.join(', ')}
+
+Return JSON:
+{
+  "schemaVersion": "childlearn.cold-start-baseline.v1",
+  "confidence": number,
+  "baselineTheta": { "<skillKey>": number },
+  "recommendedDifficulty": number,
+  "nextSkill": string,
+  "notes": string[]
+}`;
 
 const STORY_POLISH_SYSTEM_PROMPT = `You rewrite one preschool-friendly Chinese math story prompt for ages 4-6.
 
@@ -535,6 +867,133 @@ function parseVariant(value: unknown): QuestionVariant | null {
     : null;
 }
 
+function parseReasoningKind(value: unknown): QuestionReasoning['kind'] | null {
+  return value === 'single' || value === 'multiStep' || value === 'narration'
+    ? value
+    : null;
+}
+
+function parseReasoningStrategy(value: unknown): QuestionReasoning['strategy'] | null {
+  return value === 'makeTen' ||
+    value === 'doubles' ||
+    value === 'countOn' ||
+    value === 'direct'
+    ? value
+    : null;
+}
+
+function normalizeStepChoices(rawChoices: unknown): QuestionOption[] | null {
+  if (!Array.isArray(rawChoices)) {
+    return null;
+  }
+
+  const normalized = rawChoices.flatMap((item, index) => {
+    if (typeof item === 'number' && Number.isFinite(item)) {
+      return [
+        {
+          id: `step-option-${index}-${item}`,
+          label: String(item),
+          value: Math.round(item),
+        },
+      ];
+    }
+
+    if (
+      isRecord(item) &&
+      typeof item.label === 'string' &&
+      Number.isFinite(Number(item.value))
+    ) {
+      const value = Math.round(Number(item.value));
+      const label = compactText(item.label).slice(0, 20);
+      if (!label) {
+        return [];
+      }
+
+      return [
+        {
+          id: typeof item.id === 'string' ? item.id.slice(0, 40) : `step-option-${index}-${value}`,
+          label,
+          value,
+        },
+      ];
+    }
+
+    return [];
+  });
+
+  const unique = normalized.filter(
+    (option, index, options) =>
+      options.findIndex(
+        (candidate) => candidate.label === option.label && candidate.value === option.value,
+      ) === index,
+  );
+  return unique.length >= 2 ? unique.slice(0, 4) : null;
+}
+
+function normalizeQuestionReasoning(payload: unknown): QuestionReasoning | undefined {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  const kind = parseReasoningKind(payload.kind);
+  const strategy = parseReasoningStrategy(payload.strategy);
+  if (!kind || !strategy) {
+    return undefined;
+  }
+
+  const narrative =
+    typeof payload.narrative === 'string' ? compactText(payload.narrative).slice(0, 80) : undefined;
+
+  if (kind !== 'multiStep') {
+    return {
+      kind,
+      strategy,
+      narrative,
+    };
+  }
+
+  const steps = Array.isArray(payload.steps)
+    ? payload.steps.slice(0, 4).flatMap((step, index): QuestionReasoningStep[] => {
+        if (!isRecord(step)) {
+          return [];
+        }
+
+        const stem = typeof step.stem === 'string' ? compactText(step.stem).slice(0, 60) : '';
+        const choices = normalizeStepChoices(step.choices);
+        const correctIndex = Math.round(finiteNumber(step.correctIndex) ?? -1);
+        const stepSkillKey = compactOptionalText(step.stepSkillKey, 32);
+
+        if (!stem || !choices || !stepSkillKey || correctIndex < 0 || correctIndex >= choices.length) {
+          return [];
+        }
+
+        return [
+          {
+            stepId:
+              compactOptionalText(step.stepId, 24) ??
+              `step-${index + 1}`,
+            stem,
+            choices,
+            correctIndex,
+            stepSkillKey,
+            hintOnWrong: compactOptionalText(step.hintOnWrong, 60) ?? undefined,
+          },
+        ];
+      })
+    : [];
+
+  if (steps.length === 0) {
+    return undefined;
+  }
+
+  return {
+    kind: 'multiStep',
+    strategy,
+    narrative,
+    steps,
+  };
+}
+
 function extractIntegerTokens(text: string) {
   return (text.match(/\d+/g) ?? []).map((value) => Number(value));
 }
@@ -581,6 +1040,27 @@ function validateStoryPolishPrompt(
   }
 
   return prompt;
+}
+
+function extractQuestionCandidate(payload: unknown) {
+  if (!isRecord(payload)) {
+    return {
+      confidence: null,
+      estimatedTheta: null,
+      questionPayload: payload,
+    };
+  }
+
+  const questionPayload = isRecord(payload.question) ? payload.question : payload;
+  const confidence = finiteNumber(payload.confidence);
+  const estimatedTheta =
+    finiteNumber(questionPayload.estimatedTheta) ?? finiteNumber(payload.estimatedTheta);
+
+  return {
+    confidence,
+    estimatedTheta,
+    questionPayload,
+  };
 }
 
 function normalizeQuestionPayload(
@@ -690,6 +1170,7 @@ function normalizeQuestionPayload(
         : variant === 'numberLine'
           ? [numberLine?.start ?? 0, numberLine ? numberLine.end - numberLine.start : answer]
           : [objects.length];
+  const reasoning = normalizeQuestionReasoning(payload.reasoning);
 
   return {
     answer,
@@ -707,6 +1188,7 @@ function normalizeQuestionPayload(
     options,
     principleText,
     prompt,
+    reasoning,
     scaffoldText,
     source: 'llm',
     theme,
@@ -717,17 +1199,217 @@ function normalizeQuestionPayload(
 function buildQuestionPromptBody(body: QuestionRequestBody) {
   const difficulty = clamp(Math.round(body.difficulty ?? 1), 1, 10);
   const band = getMathProgressionBand(difficulty);
+  const targetRecord = isRecord(body.target) ? body.target : null;
+  const learnerRecord = isRecord(body.learner) ? body.learner : null;
+  const constraintsRecord = isRecord(body.constraints) ? body.constraints : null;
   return {
     difficulty,
-    lane: body.lane ?? 'current',
-    recentErrorPatterns: body.recentErrorPatterns ?? [],
+    lane:
+      compactOptionalText(targetRecord?.lane, 24) ??
+      compactOptionalText(body.lane, 24) ??
+      'current',
+    learner: {
+      ageMonths: clamp(Math.round(finiteNumber(learnerRecord?.ageMonths) ?? 60), 48, 84),
+      fatigueLevel: clamp(Math.round(finiteNumber(learnerRecord?.fatigueLevel) ?? 0), 0, 2),
+      flowState: compactOptionalText(learnerRecord?.flowState, 24) ?? 'flow',
+      sessionMinutes: Math.max(0, finiteNumber(learnerRecord?.sessionMinutes) ?? 0),
+      slidingAccuracy: clamp(finiteNumber(learnerRecord?.slidingAccuracy) ?? 0, 0, 1),
+      stage: compactOptionalText(learnerRecord?.stage, 16) ?? 'k',
+    },
+    skillRadar: Array.isArray(body.skillRadar)
+      ? body.skillRadar.slice(0, 18).flatMap((skill) => {
+          if (!isRecord(skill)) {
+            return [];
+          }
+
+          return [
+            {
+              confidence: clamp(finiteNumber(skill.confidence) ?? 0, 0, 1),
+              key: compactOptionalText(skill.key, 48) ?? 'unknown',
+              lastSeenMinAgo:
+                skill.lastSeenMinAgo === null
+                  ? null
+                  : Math.max(0, Math.round(finiteNumber(skill.lastSeenMinAgo) ?? 0)),
+              mastered: normalizeBoolean(skill.mastered),
+              theta: clamp(finiteNumber(skill.theta) ?? 0, -2, 2),
+            },
+          ];
+        })
+      : [],
+    target: {
+      currentTheta: clamp(
+        finiteNumber(targetRecord?.currentTheta) ?? 0,
+        -2,
+        2,
+      ),
+      flowOffset: clamp(finiteNumber(targetRecord?.flowOffset) ?? 0, -1, 1.5),
+      lane:
+        compactOptionalText(targetRecord?.lane, 24) ??
+        compactOptionalText(body.lane, 24) ??
+        'current',
+      reasonCode: compactOptionalText(targetRecord?.reasonCode, 48) ?? 'adaptive_target',
+      skillKey:
+        compactOptionalText(targetRecord?.skillKey, 48) ??
+        compactOptionalText(body.targetSkillKey, 48) ??
+        null,
+      targetTheta: clamp(
+        finiteNumber(targetRecord?.targetTheta ?? body.targetTheta) ?? 0,
+        -2,
+        2.5,
+      ),
+    },
+    recentQuestions: Array.isArray(body.recentQuestions)
+      ? body.recentQuestions.slice(-8).flatMap((question) => {
+          if (!isRecord(question)) {
+            return [];
+          }
+
+          return [
+            {
+              childAnswer: compactOptionalText(question.childAnswer, 24) ?? '',
+              choices: sanitizeStringArray(question.choices, 4, 24),
+              correctAnswer: compactOptionalText(question.correctAnswer, 24) ?? '',
+              errorPattern: compactOptionalText(question.errorPattern, 24),
+              firstAttemptCorrect: normalizeBoolean(question.firstAttemptCorrect),
+              hintCount: Math.max(0, Math.round(finiteNumber(question.hintCount) ?? 0)),
+              reactionTimeMs: Math.max(
+                0,
+                Math.round(finiteNumber(question.reactionTimeMs) ?? 0),
+              ),
+              skillKeys: sanitizeStringArray(question.skillKeys, 6, 48),
+              stem: compactOptionalText(question.stem, 80) ?? '',
+              thetaAtTime: clamp(finiteNumber(question.thetaAtTime) ?? 0, -2, 2.5),
+            },
+          ];
+        })
+      : [],
+    recentFingerprints: sanitizeStringArray(body.recentFingerprints, 30, 16),
+    recentErrorPatterns: (body.recentErrorPatterns ?? []).slice(-4),
     recentResponses: (body.recentResponses ?? []).slice(-8),
-    requestedVariant: body.variant ?? 'matching',
-    targetSkillKey: body.targetSkillKey ?? null,
-    targetTheta: body.targetTheta ?? null,
+    requestedVariant:
+      parseVariant(constraintsRecord?.variant) ??
+      body.variant ??
+      'matching',
+    constraints: {
+      forbiddenPatterns: sanitizeStringArray(
+        constraintsRecord?.forbiddenPatterns,
+        8,
+        32,
+      ),
+      maxChoices: clamp(
+        Math.round(finiteNumber(constraintsRecord?.maxChoices) ?? 4),
+        2,
+        4,
+      ),
+      reasoningMode:
+        constraintsRecord?.reasoningMode === 'multiStep' ||
+        constraintsRecord?.reasoningMode === 'narration'
+          ? constraintsRecord.reasoningMode
+          : 'direct',
+      readingLevel: compactOptionalText(constraintsRecord?.readingLevel, 24) ?? 'pre-literate',
+    },
+    targetSkillKey:
+      compactOptionalText(targetRecord?.skillKey, 48) ??
+      compactOptionalText(body.targetSkillKey, 48) ??
+      null,
+    targetTheta:
+      finiteNumber(targetRecord?.targetTheta ?? body.targetTheta) ?? null,
     rangeHint: band.quantityRange,
     totalRangeHint: band.totalRange,
     levelHint: band.level,
+  };
+}
+
+function sanitizeColdStartAttemptHistory(
+  value: ColdStartProbeRequestBody['attemptHistory'],
+  limit: number,
+) {
+  return Array.isArray(value)
+    ? value.slice(-limit).flatMap((attempt) => {
+        if (!isRecord(attempt)) {
+          return [];
+        }
+
+        return [
+          {
+            childAnswer: compactOptionalText(attempt.childAnswer, 24) ?? '',
+            choices: sanitizeStringArray(attempt.choices, 4, 24),
+            correctAnswer: compactOptionalText(attempt.correctAnswer, 24) ?? '',
+            errorPattern: compactOptionalText(attempt.errorPattern, 24),
+            finalCorrect: normalizeBoolean(attempt.finalCorrect),
+            firstAttemptCorrect: normalizeBoolean(attempt.firstAttemptCorrect),
+            hintCount: Math.max(0, Math.round(finiteNumber(attempt.hintCount) ?? 0)),
+            questionIndex: Math.max(0, Math.round(finiteNumber(attempt.questionIndex) ?? 0)),
+            reactionTimeMs: Math.max(
+              0,
+              Math.round(finiteNumber(attempt.reactionTimeMs) ?? 0),
+            ),
+            result: compactOptionalText(attempt.result, 32) ?? 'correct',
+            skillKeys: sanitizeLearnerSkillKeys(attempt.skillKeys),
+            stem: compactOptionalText(attempt.stem, 80) ?? '',
+            thetaAtTime: clamp(finiteNumber(attempt.thetaAtTime) ?? 0, -2, 2.5),
+            totalTimeMs: Math.max(0, Math.round(finiteNumber(attempt.totalTimeMs) ?? 0)),
+          },
+        ];
+      })
+    : [];
+}
+
+function buildColdStartProbePromptBody(body: ColdStartProbeRequestBody) {
+  const ageMonths = clamp(Math.round(finiteNumber(body.ageMonths) ?? 60), 48, 84);
+  return {
+    ageMonths,
+    probeIndex: Math.max(1, Math.round(finiteNumber(body.probeIndex) ?? 1)),
+    remainingProbes: Math.max(1, Math.round(finiteNumber(body.remainingProbes) ?? 5)),
+    ageSeedTheta: defaultBaselineThetaForAge(ageMonths),
+    attemptHistory: sanitizeColdStartAttemptHistory(body.attemptHistory, 4),
+  };
+}
+
+function normalizeColdStartAssessmentPayload(
+  payload: unknown,
+  body: ColdStartAssessRequestBody,
+) {
+  if (!isRecord(payload)) {
+    return null;
+  }
+
+  const ageMonths = clamp(Math.round(finiteNumber(body.ageMonths) ?? 60), 48, 84);
+  const seedTheta = defaultBaselineThetaForAge(ageMonths);
+  const rawBaseline = isRecord(payload.baselineTheta) ? payload.baselineTheta : {};
+  const providedValues = LEARNER_SKILL_KEYS.flatMap((skillKey) => {
+    const value = finiteNumber(rawBaseline[skillKey]);
+    return value === null ? [] : [clamp(value, -1.5, 2.5)];
+  });
+  const meanTheta =
+    providedValues.length > 0
+      ? providedValues.reduce((sum, value) => sum + value, 0) / providedValues.length
+      : seedTheta;
+  const baselineTheta = Object.fromEntries(
+    LEARNER_SKILL_KEYS.map((skillKey) => {
+      const value = finiteNumber(rawBaseline[skillKey]);
+      return [skillKey, round(clamp(value === null ? meanTheta : value, -1.5, 2.5))];
+    }),
+  ) as Record<LearnerSkillKey, number>;
+  const radarMean =
+    LEARNER_RADAR_SKILLS.reduce((sum, skillKey) => sum + baselineTheta[skillKey], 0) /
+    LEARNER_RADAR_SKILLS.length;
+  const nextSkill =
+    typeof payload.nextSkill === 'string' && LEARNER_SKILL_KEYS.includes(payload.nextSkill as LearnerSkillKey)
+      ? (payload.nextSkill as LearnerSkillKey)
+      : undefined;
+
+  return {
+    schemaVersion: 'childlearn.cold-start-baseline.v1' as const,
+    confidence: clamp(finiteNumber(payload.confidence) ?? 0.3, 0, 1),
+    baselineTheta,
+    recommendedDifficulty: clamp(
+      Math.round(finiteNumber(payload.recommendedDifficulty) ?? thetaToDifficulty(radarMean)),
+      1,
+      10,
+    ),
+    nextSkill,
+    notes: sanitizeStringArray(payload.notes, 6, 80),
   };
 }
 
@@ -746,7 +1428,8 @@ async function handleQuestionAction(
     QUESTION_SYSTEM_PROMPT,
     buildQuestionPromptBody(body),
   );
-  const question = normalizeQuestionPayload(payload, body);
+  const candidate = extractQuestionCandidate(payload);
+  const question = normalizeQuestionPayload(candidate.questionPayload, body);
   if (!question) {
     return {
       status: 502,
@@ -754,11 +1437,135 @@ async function handleQuestionAction(
     };
   }
 
-  const responseBody = { question };
+  const responseBody = {
+    confidence:
+      candidate.confidence !== null ? clamp(candidate.confidence, 0, 1) : 0,
+    estimatedTheta:
+      candidate.estimatedTheta !== null ? clamp(candidate.estimatedTheta, -2, 2.5) : null,
+    question,
+  };
   setCached('question', body, responseBody);
   return {
     status: 200,
     body: responseBody,
+  };
+}
+
+async function handleCrossTenQuestionAction(
+  body: QuestionRequestBody,
+  context: ServerExecutionContext,
+): Promise<ServerResult> {
+  const cached = getCached('cross-ten-question', body);
+  if (cached) {
+    return { status: 200, body: cached };
+  }
+
+  const payload = await requestStructuredJson(
+    context,
+    'cross-ten-question',
+    CROSS_TEN_SYSTEM_PROMPT,
+    buildQuestionPromptBody(body),
+  );
+  const candidate = extractQuestionCandidate(payload);
+  const question = normalizeQuestionPayload(candidate.questionPayload, body);
+  if (!question?.reasoning || question.reasoning.kind !== 'multiStep') {
+    return {
+      status: 502,
+      body: { error: 'invalid_cross_ten_payload' },
+    };
+  }
+
+  const responseBody = {
+    confidence:
+      candidate.confidence !== null ? clamp(candidate.confidence, 0, 1) : 0,
+    estimatedTheta:
+      candidate.estimatedTheta !== null ? clamp(candidate.estimatedTheta, -2, 2.5) : null,
+    question,
+  };
+  setCached('cross-ten-question', body, responseBody);
+  return {
+    status: 200,
+    body: responseBody,
+  };
+}
+
+async function handleColdStartProbeAction(
+  body: ColdStartProbeRequestBody,
+  context: ServerExecutionContext,
+): Promise<ServerResult> {
+  const cached = getCached('cold-start-probe', body);
+  if (cached) {
+    return { status: 200, body: cached };
+  }
+
+  const payload = await requestStructuredJson(
+    context,
+    'cold-start-probe',
+    COLD_START_PROBE_SYSTEM_PROMPT,
+    buildColdStartProbePromptBody(body),
+  );
+  const candidate = extractQuestionCandidate(payload);
+  const fallbackDifficulty = thetaToDifficulty(
+    defaultBaselineThetaForAge(clamp(Math.round(finiteNumber(body.ageMonths) ?? 60), 48, 84)),
+  );
+  const question = normalizeQuestionPayload(candidate.questionPayload, {
+    difficulty: fallbackDifficulty,
+    serial: Math.round(finiteNumber(body.probeIndex) ?? 1),
+    variant: parseVariant(
+      isRecord(candidate.questionPayload) ? candidate.questionPayload.variant : undefined,
+    ) ?? undefined,
+  });
+  if (!question) {
+    return {
+      status: 502,
+      body: { error: 'invalid_cold_start_probe_payload' },
+    };
+  }
+
+  const responseBody = {
+    confidence:
+      candidate.confidence !== null ? clamp(candidate.confidence, 0, 1) : 0,
+    estimatedTheta:
+      candidate.estimatedTheta !== null ? clamp(candidate.estimatedTheta, -2, 2.5) : null,
+    question,
+  };
+  setCached('cold-start-probe', body, responseBody);
+  return {
+    status: 200,
+    body: responseBody,
+  };
+}
+
+async function handleColdStartAssessAction(
+  body: ColdStartAssessRequestBody,
+  context: ServerExecutionContext,
+): Promise<ServerResult> {
+  const cached = getCached('cold-start-assess', body);
+  if (cached) {
+    return { status: 200, body: cached };
+  }
+
+  const payload = await requestStructuredJson(
+    context,
+    'cold-start-assess',
+    COLD_START_ASSESS_SYSTEM_PROMPT,
+    {
+      ageMonths: clamp(Math.round(finiteNumber(body.ageMonths) ?? 60), 48, 84),
+      attemptHistory: sanitizeColdStartAttemptHistory(body.attemptHistory, 5),
+    },
+  );
+  const assessment = normalizeColdStartAssessmentPayload(payload, body);
+  if (!assessment) {
+    return {
+      status: 502,
+      body: { error: 'invalid_cold_start_assessment_payload' },
+    };
+  }
+
+  setCached('cold-start-assess', body, assessment);
+  return {
+    status: 200,
+    body: assessment,
   };
 }
 
@@ -897,6 +1704,24 @@ export async function executeAiAction(
       return await handleQuestionAction((body ?? {}) as QuestionRequestBody, context);
     }
 
+    if (action === 'cross-ten-question') {
+      return await handleCrossTenQuestionAction((body ?? {}) as QuestionRequestBody, context);
+    }
+
+    if (action === 'cold-start-probe') {
+      return await handleColdStartProbeAction(
+        (body ?? {}) as ColdStartProbeRequestBody,
+        context,
+      );
+    }
+
+    if (action === 'cold-start-assess') {
+      return await handleColdStartAssessAction(
+        (body ?? {}) as ColdStartAssessRequestBody,
+        context,
+      );
+    }
+
     if (action === 'story-polish') {
       return await handleStoryPolishAction(
         (body ?? {}) as StoryPolishRequestBody,
@@ -931,6 +1756,12 @@ export async function executeAiAction(
             ? { observation: null, reason: 'ai_unconfigured' }
             : action === 'question'
               ? { question: null, reason: 'ai_unconfigured' }
+              : action === 'cross-ten-question'
+                ? { question: null, confidence: 0, estimatedTheta: null, reason: 'ai_unconfigured' }
+              : action === 'cold-start-probe'
+                ? { question: null, confidence: 0, estimatedTheta: null, reason: 'ai_unconfigured' }
+                : action === 'cold-start-assess'
+                  ? { assessment: null, reason: 'ai_unconfigured' }
               : action === 'story-polish'
                 ? { prompt: null, reason: 'ai_unconfigured' }
               : action === 'programming-hint'
@@ -1064,6 +1895,9 @@ export async function proxyTelemetry(
 }
 
 export const DEFAULT_AI_ACTIONS = {
+  coldStartAssess: COLD_START_ASSESS_ACTION,
+  coldStartProbe: COLD_START_PROBE_ACTION,
+  crossTenQuestion: CROSS_TEN_QUESTION_ACTION,
   observe: OBSERVE_ACTION,
   parentSummary: PARENT_SUMMARY_ACTION,
   programmingHint: PROGRAMMING_HINT_ACTION,

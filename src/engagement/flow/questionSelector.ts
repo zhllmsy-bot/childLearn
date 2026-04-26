@@ -10,6 +10,7 @@ import {
 import type { ApprovedFlowPolicy } from './types';
 
 export type FlowQuestionLane = 'confidence' | 'review' | 'current' | 'challenge';
+export type FlowQuestionReasoningMode = 'direct' | 'multiStep' | 'narration';
 
 export interface FlowQuestionPlan {
   lane: FlowQuestionLane;
@@ -17,6 +18,7 @@ export interface FlowQuestionPlan {
   targetSkillKey?: LearnerSkillKey;
   targetTheta?: number;
   variant?: QuestionVariant;
+  reasoningMode?: FlowQuestionReasoningMode;
 }
 
 interface SelectFlowQuestionPlanInput {
@@ -107,18 +109,18 @@ function variantForSkill(skillKey: LearnerSkillKey): QuestionVariant | null {
 
 function targetOffsetForLane(lane: FlowQuestionLane) {
   if (lane === 'confidence') {
-    return -0.45;
+    return -0.3;
   }
 
   if (lane === 'review') {
-    return -0.15;
+    return -0.1;
   }
 
   if (lane === 'challenge') {
-    return 0.4;
+    return 0.8;
   }
 
-  return 0.2;
+  return 0.5;
 }
 
 function learnerPlanAdjustment({
@@ -134,6 +136,7 @@ function learnerPlanAdjustment({
   if (!targetSkillKey || !learnerProfile) {
     return {
       difficulty: baselineDifficulty,
+      reasoningMode: undefined,
       targetSkillKey: undefined,
       targetTheta: undefined,
       variant: undefined,
@@ -145,9 +148,26 @@ function learnerPlanAdjustment({
   const difficulty = clampDifficulty(
     Math.min(Math.max(thetaDifficulty, baselineDifficulty - 1), baselineDifficulty + 1),
   );
+  const makeTenSkill = learnerProfile.skills.makeTen;
+  const crossTenSkill = learnerProfile.skills.crossTenBridge;
+  let reasoningMode: FlowQuestionReasoningMode | undefined;
+
+  if (targetSkillKey === 'crossTenBridge') {
+    const makeTenReady =
+      makeTenSkill.theta >= 0.3 && makeTenSkill.confidence >= 0.5;
+    const crossTenReady =
+      crossTenSkill.theta >= 0.8 && crossTenSkill.confidence >= 0.7;
+
+    if (makeTenReady && !crossTenReady) {
+      reasoningMode = 'multiStep';
+    } else {
+      reasoningMode = 'direct';
+    }
+  }
 
   return {
     difficulty,
+    reasoningMode,
     targetSkillKey,
     targetTheta,
     variant: variantForSkill(targetSkillKey) ?? undefined,
@@ -179,6 +199,10 @@ export function buildFlowQuestionPlanForLane({
   if (learnerAdjustment.targetSkillKey) {
     plan.targetSkillKey = learnerAdjustment.targetSkillKey;
     plan.targetTheta = learnerAdjustment.targetTheta;
+  }
+
+  if (learnerAdjustment.reasoningMode) {
+    plan.reasoningMode = learnerAdjustment.reasoningMode;
   }
 
   return plan;

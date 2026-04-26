@@ -71,6 +71,7 @@ describe('buildAdaptiveQuestionPayload', () => {
       history,
       lane: 'challenge',
       learnerProfile,
+      reasoningMode: 'multiStep',
       serial: 3,
       targetSkillKey: 'makeTen',
       targetTheta: 0.45,
@@ -96,9 +97,25 @@ describe('buildAdaptiveQuestionPayload', () => {
     ]);
     expect(payload.constraints).toMatchObject({
       variant: 'makeTen',
+      reasoningMode: 'multiStep',
       maxChoices: 4,
       readingLevel: 'pre-literate',
     });
     expect(payload.recentResponses).toHaveLength(2);
+  });
+
+  it('seeds a stronger cold-start target theta from age when no attempts exist yet', () => {
+    const payload = buildAdaptiveQuestionPayload({
+      difficulty: 3,
+      lane: 'current',
+      history: [],
+      learnerProfile: createEmptyLearnerProfile(),
+      serial: 0,
+      nowMs: 120_000,
+    });
+
+    expect(payload.target.skillKey).toBe('countingTo10');
+    expect(payload.target.currentTheta).toBe(0.6);
+    expect(payload.target.targetTheta).toBe(1.1);
   });
 });

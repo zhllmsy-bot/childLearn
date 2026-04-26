@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { QuestionAttemptRecord } from '../engagement/flow/types';
 import {
+  applyColdStartBaseline,
   applyProfileRefinement,
   createEmptyLearnerProfile,
+  LEARNER_SKILL_KEYS,
   parseProfileRefinement,
   skillKeysForQuestion,
   updateLearnerModel,
@@ -174,5 +176,46 @@ describe('learnerModel', () => {
     expect(profile.skills.makeTen.theta).toBeLessThan(0);
     expect(profile.skills.makeTen.theta).toBeGreaterThan(-0.25);
     expect(profile.recommendedSkill).toBe('makeTen');
+  });
+
+  it('applies a cold-start baseline across unseen skills', () => {
+    const profile = applyColdStartBaseline(createEmptyLearnerProfile(), {
+      schemaVersion: 'childlearn.cold-start-baseline.v1',
+      confidence: 0.82,
+      baselineTheta: {
+        ...Object.fromEntries(LEARNER_SKILL_KEYS.map((skillKey) => [skillKey, 0.6])),
+        makeTen: 1.1,
+      } as Record<(typeof LEARNER_SKILL_KEYS)[number], number>,
+      recommendedDifficulty: 6,
+      nextSkill: 'makeTen',
+      notes: ['probe converged'],
+    });
+
+    expect(profile.skills.countingTo10.theta).toBe(0.6);
+    expect(profile.skills.makeTen.theta).toBe(1.1);
+    expect(profile.skills.makeTen.confidence).toBeGreaterThan(0.3);
+    expect(profile.recommendedSkill).toBe('makeTen');
+  });
+
+  it('supports bounded global theta shifts in profile refinements', () => {
+    const refinement = parseProfileRefinement({
+      schemaVersion: 'childlearn.profile-refinement.v1',
+      confidence: 0.88,
+      globalDeltaTheta: 0.5,
+      skillAdjustments: [],
+      errorPatterns: [],
+      safetyNotes: [],
+    });
+
+    expect(refinement).not.toBeNull();
+
+    const profile = applyProfileRefinement(
+      createEmptyLearnerProfile(),
+      refinement!,
+      3000,
+    );
+
+    expect(profile.skills.countingTo10.theta).toBeGreaterThan(0);
+    expect(profile.skills.makeTen.theta).toBeGreaterThan(0);
   });
 });

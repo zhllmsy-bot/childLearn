@@ -7,6 +7,7 @@ import {
 import { requestParentSummary } from '../../ai/api/childlearnAi';
 import type { ApprovedFlowPolicy, LlmLearningObservation } from '../../engagement/flow';
 import type { SessionStats } from '../../app/appState';
+import { track } from '../../telemetry/track';
 
 interface FocusSkillSummary {
   count: number;
@@ -24,6 +25,44 @@ interface UseParentAccessInput {
   suggestedMinutes: string;
 }
 
+export type ParentFeedbackChoice =
+  | 'too_easy'
+  | 'just_right'
+  | 'needs_challenge'
+  | 'too_hard'
+  | 'fatigued';
+
+const PARENT_FEEDBACK_STORAGE_KEY = 'childlearn.parent-feedback-v1';
+
+function readStoredParentFeedback(): ParentFeedbackChoice | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(PARENT_FEEDBACK_STORAGE_KEY) ?? 'null',
+    ) as { choice?: ParentFeedbackChoice } | null;
+    return parsed?.choice ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredParentFeedback(choice: ParentFeedbackChoice) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(
+    PARENT_FEEDBACK_STORAGE_KEY,
+    JSON.stringify({
+      choice,
+      recordedAt: Date.now(),
+    }),
+  );
+}
+
 export function useParentAccess({
   difficulty,
   flowObservation,
@@ -37,6 +76,9 @@ export function useParentAccess({
   const [parentGateOpen, setParentGateOpen] = useState(false);
   const [parentReportOpen, setParentReportOpen] = useState(false);
   const [parentSummary, setParentSummary] = useState<string | null>(null);
+  const [parentFeedback, setParentFeedback] = useState<ParentFeedbackChoice | null>(
+    readStoredParentFeedback,
+  );
   const [parentSummaryStatus, setParentSummaryStatus] = useState<
     'idle' | 'pending' | 'ready' | 'failed'
   >('idle');
@@ -116,11 +158,20 @@ export function useParentAccess({
     setParentReportOpen(false);
   }, []);
 
+  const submitParentFeedback = useCallback((choice: ParentFeedbackChoice) => {
+    setParentFeedback(choice);
+    writeStoredParentFeedback(choice);
+    track('parent.feedback_submitted', {
+      choice,
+    });
+  }, []);
+
   return {
     closeParentGate,
     closeParentReport,
     handleOpenParentGate,
     handleParentGateSuccess,
+    parentFeedback,
     parentGateOpen,
     parentReportOpen,
     parentSummary,
@@ -128,5 +179,6 @@ export function useParentAccess({
     privacyHref,
     setParentGateOpen,
     setParentReportOpen,
+    submitParentFeedback,
   };
 }

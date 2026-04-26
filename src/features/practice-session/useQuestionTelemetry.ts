@@ -160,7 +160,11 @@ export function useQuestionTelemetry({
   );
 
   const createCompletedAttemptRecord = useCallback(
-    (targetQuestion: Question, option: QuestionOption): QuestionAttemptRecord => {
+    (
+      targetQuestion: Question,
+      option: QuestionOption,
+      overrides: Partial<QuestionAttemptRecord> = {},
+    ): QuestionAttemptRecord => {
       const now = Date.now();
       const telemetry =
         activeQuestionTelemetryRef.current ??
@@ -180,21 +184,24 @@ export function useQuestionTelemetry({
           feedbackInterruptClickCount: 0,
           abandoned: false,
         } satisfies ActiveQuestionTelemetry);
-      const finalCorrect = option.value === targetQuestion.answer;
-      const firstAttemptCorrect = telemetry.attemptCount === 1 && finalCorrect;
+      const finalSelectedAnswer = overrides.finalSelectedAnswer ?? option.value;
+      const finalCorrect =
+        overrides.finalCorrect ?? finalSelectedAnswer === targetQuestion.answer;
+      const firstAttemptCorrect =
+        overrides.firstAttemptCorrect ?? (telemetry.attemptCount === 1 && finalCorrect);
 
       return {
         questionId: targetQuestion.id,
-        questionIndex: telemetry.questionIndex,
+        questionIndex: overrides.questionIndex ?? telemetry.questionIndex,
         tags: deriveQuestionDifficultyTags(targetQuestion),
-        stem: stemForQuestion(targetQuestion),
-        choices: targetQuestion.options.map((candidate) =>
+        stem: overrides.stem ?? stemForQuestion(targetQuestion),
+        choices: overrides.choices ?? targetQuestion.options.map((candidate) =>
           candidate.label.trim() || String(candidate.value),
         ),
-        correctAnswer: targetQuestion.answer,
-        childAnswer: option.label.trim() || String(option.value),
+        correctAnswer: overrides.correctAnswer ?? targetQuestion.answer,
+        childAnswer: overrides.childAnswer ?? (option.label.trim() || String(option.value)),
         firstSelectedAnswer: telemetry.firstSelectedAnswer,
-        finalSelectedAnswer: option.value,
+        finalSelectedAnswer,
         firstAttemptCorrect,
         finalCorrect,
         attemptCount: telemetry.attemptCount,
@@ -208,11 +215,14 @@ export function useQuestionTelemetry({
         rapidClickCount: telemetry.rapidClickCount,
         feedbackInterruptClickCount: telemetry.feedbackInterruptClickCount,
         abandoned: telemetry.abandoned,
-        result: finalCorrect
-          ? firstAttemptCorrect
-            ? 'correct'
-            : 'wrong_first_then_correct'
-          : 'wrong_final',
+        result:
+          overrides.result ??
+          (finalCorrect
+            ? firstAttemptCorrect
+              ? 'correct'
+              : 'wrong_first_then_correct'
+            : 'wrong_final'),
+        strategyUse: overrides.strategyUse,
       };
     },
     [questionIndex],

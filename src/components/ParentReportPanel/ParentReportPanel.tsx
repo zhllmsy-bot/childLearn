@@ -21,11 +21,13 @@ import {
 import { StickerArtwork } from '../_primitives/StickerArtwork';
 import { PrivacyNotice } from '../PrivacyNotice/PrivacyNotice';
 import type { Question } from '../../curriculum/types';
+import type { ParentFeedbackChoice } from '../../features/parent-gate/useParentAccess';
 
 interface ParentReportPanelProps {
   open: boolean;
   onClose: () => void;
   onRestartDiagnostic: () => void;
+  onSelectParentFeedback: (choice: ParentFeedbackChoice) => void;
   correct: number;
   attempted: number;
   maxCombo: number;
@@ -43,6 +45,7 @@ interface ParentReportPanelProps {
   flowObserverReason?: string | null;
   flowObserverIssue?: string | null;
   learnerProfile?: LearnerProfile;
+  parentFeedback?: ParentFeedbackChoice | null;
   parentSummary?: string | null;
   parentSummaryStatus?: 'idle' | 'pending' | 'ready' | 'failed';
   privacyHref?: string;
@@ -127,6 +130,44 @@ const FOCUS_SKILL_LABELS: Record<string, string> = {
   'range:within_20': '20以内数量',
   'range:within_30': '30以内数量',
 };
+
+const PARENT_FEEDBACK_OPTIONS: Array<{
+  choice: ParentFeedbackChoice;
+  detail: string;
+  label: string;
+  tone: string;
+}> = [
+  {
+    choice: 'too_easy',
+    detail: '今晚偏轻松',
+    label: '太简单',
+    tone: 'bg-sky-50 text-sky-900 ring-sky-100',
+  },
+  {
+    choice: 'just_right',
+    detail: '节奏刚刚好',
+    label: '正合适',
+    tone: 'bg-emerald-50 text-emerald-900 ring-emerald-100',
+  },
+  {
+    choice: 'needs_challenge',
+    detail: '还能再拔一点',
+    label: '可加挑战',
+    tone: 'bg-violet-50 text-violet-900 ring-violet-100',
+  },
+  {
+    choice: 'too_hard',
+    detail: '明显皱眉卡住',
+    label: '太难了',
+    tone: 'bg-amber-50 text-amber-900 ring-amber-100',
+  },
+  {
+    choice: 'fatigued',
+    detail: '今天有点累',
+    label: '有点疲劳',
+    tone: 'bg-rose-50 text-rose-900 ring-rose-100',
+  },
+];
 
 function thetaToRadarRatio(theta: number) {
   return Math.min(Math.max((theta + 2) / 4, 0.12), 1);
@@ -276,6 +317,7 @@ export function ParentReportPanel({
   open,
   onClose,
   onRestartDiagnostic,
+  onSelectParentFeedback,
   correct,
   attempted,
   maxCombo,
@@ -293,6 +335,7 @@ export function ParentReportPanel({
   flowObserverReason,
   flowObserverIssue,
   learnerProfile,
+  parentFeedback,
   parentSummary,
   parentSummaryStatus = 'idle',
   privacyHref,
@@ -378,6 +421,37 @@ export function ParentReportPanel({
                     今天的数据还不够多，先继续做几题，我们会把节奏和重点整理给家长。
                   </p>
                 )}
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-2xl font-black text-emerald-950">家长观察</h3>
+              <div className="rounded-3xl bg-white p-4 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-100">
+                <div className="grid grid-cols-2 gap-2">
+                  {PARENT_FEEDBACK_OPTIONS.map((option) => {
+                    const selected = parentFeedback === option.choice;
+                    return (
+                      <button
+                        key={option.choice}
+                        type="button"
+                        onClick={() => onSelectParentFeedback(option.choice)}
+                        className={`rounded-2xl px-3 py-3 text-left ring-1 transition ${
+                          selected
+                            ? `${option.tone} shadow-lg shadow-emerald-500/10 ring-2`
+                            : 'bg-white text-emerald-900 ring-emerald-100'
+                        }`}
+                      >
+                        <div className="text-base font-black">{option.label}</div>
+                        <div className="mt-1 text-sm font-bold opacity-80">
+                          {option.detail}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-3 text-sm font-bold leading-relaxed text-emerald-800/80">
+                  这组反馈只给家长报告和后续调参参考，不会出现在孩子界面里。
+                </p>
               </div>
             </section>
 

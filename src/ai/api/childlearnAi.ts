@@ -1,10 +1,15 @@
 import type { LearnerProfile } from '../learnerModel';
 import type { LearningBatchReport } from '../../engagement/flow';
 import type { Question, QuestionVariant } from '../../curriculum/types';
+import type { ColdStartBaselineAssessment } from '../learnerModel';
 import {
   buildAdaptiveQuestionPayload,
   type AdaptiveQuestionPayload,
 } from '../../engagement/flow/buildAdaptiveQuestionPayload';
+import type {
+  ColdStartBaselinePayload,
+  ColdStartProbePayload,
+} from '../coldStartAgent';
 import {
   resolveChildlearnEndpoint,
   resolveRuntimeUrl,
@@ -16,6 +21,9 @@ const DEFAULT_AI_ACTIONS = {
   parentSummary: '/api/ai?action=parent-summary',
   programmingHint: '/api/ai?action=programming-hint',
   question: '/api/ai?action=question',
+  crossTenQuestion: '/api/ai?action=cross-ten-question',
+  coldStartProbe: '/api/ai?action=cold-start-probe',
+  coldStartAssess: '/api/ai?action=cold-start-assess',
   storyPolish: '/api/ai?action=story-polish',
 } as const;
 const DEFAULT_SYNC_ACTION = '/api/learning-sync';
@@ -24,6 +32,9 @@ const AI_ACTION_QUERY_NAMES = {
   parentSummary: 'parent-summary',
   programmingHint: 'programming-hint',
   question: 'question',
+  crossTenQuestion: 'cross-ten-question',
+  coldStartProbe: 'cold-start-probe',
+  coldStartAssess: 'cold-start-assess',
   storyPolish: 'story-polish',
 } as const;
 
@@ -62,6 +73,12 @@ type StoryPolishPayload = {
   first: number;
   second: number;
 };
+
+export interface CoPilotQuestionResult {
+  confidence: number;
+  estimatedTheta: number | null;
+  question: Question;
+}
 
 function aiBaseUrl() {
   return resolveRuntimeUrl(import.meta.env.VITE_CHILDLEARN_AI_URL?.trim() || DEFAULT_AI_ACTION);
@@ -167,9 +184,93 @@ function isQuestion(value: unknown): value is Question {
 
 export async function requestCoPilotQuestion(
   payload: AdaptiveQuestionPayload,
-): Promise<Question | null> {
-  const result = await postJson<{ question?: unknown }>(aiActionUrl('question'), payload);
-  return result?.question && isQuestion(result.question) ? result.question : null;
+): Promise<CoPilotQuestionResult | null> {
+  const result = await postJson<{
+    confidence?: unknown;
+    estimatedTheta?: unknown;
+    question?: unknown;
+  }>(aiActionUrl('question'), payload);
+  if (!result?.question || !isQuestion(result.question)) {
+    return null;
+  }
+
+  const confidence = Number(result.confidence);
+  const estimatedTheta = Number(result.estimatedTheta);
+
+  return {
+    question: result.question,
+    confidence:
+      Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? confidence : 0,
+    estimatedTheta: Number.isFinite(estimatedTheta) ? estimatedTheta : null,
+  };
+}
+
+export async function requestCrossTenQuestion(
+  payload: AdaptiveQuestionPayload,
+): Promise<CoPilotQuestionResult | null> {
+  const result = await postJson<{
+    confidence?: unknown;
+    estimatedTheta?: unknown;
+    question?: unknown;
+  }>(aiActionUrl('crossTenQuestion'), payload);
+  if (!result?.question || !isQuestion(result.question)) {
+    return null;
+  }
+
+  const confidence = Number(result.confidence);
+  const estimatedTheta = Number(result.estimatedTheta);
+
+  return {
+    question: result.question,
+    confidence:
+      Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? confidence : 0,
+    estimatedTheta: Number.isFinite(estimatedTheta) ? estimatedTheta : null,
+  };
+}
+
+function isColdStartBaselineAssessment(value: unknown): value is ColdStartBaselineAssessment {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'schemaVersion' in value &&
+    value.schemaVersion === 'childlearn.cold-start-baseline.v1' &&
+    'confidence' in value &&
+    Number.isFinite(Number(value.confidence)) &&
+    'recommendedDifficulty' in value &&
+    Number.isFinite(Number(value.recommendedDifficulty)) &&
+    'baselineTheta' in value &&
+    typeof value.baselineTheta === 'object' &&
+    value.baselineTheta !== null
+  );
+}
+
+export async function requestColdStartProbeQuestion(
+  payload: ColdStartProbePayload,
+): Promise<CoPilotQuestionResult | null> {
+  const result = await postJson<{
+    confidence?: unknown;
+    estimatedTheta?: unknown;
+    question?: unknown;
+  }>(aiActionUrl('coldStartProbe'), payload);
+  if (!result?.question || !isQuestion(result.question)) {
+    return null;
+  }
+
+  const confidence = Number(result.confidence);
+  const estimatedTheta = Number(result.estimatedTheta);
+  return {
+    question: result.question,
+    confidence:
+      Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? confidence : 0,
+    estimatedTheta: Number.isFinite(estimatedTheta) ? estimatedTheta : null,
+  };
+}
+
+export async function requestColdStartBaselineAssessment(
+  payload: ColdStartBaselinePayload,
+): Promise<ColdStartBaselineAssessment | null> {
+  const result = await postJson<unknown>(aiActionUrl('coldStartAssess'), payload);
+  return isColdStartBaselineAssessment(result) ? result : null;
 }
 
 export async function requestProgrammingHint(

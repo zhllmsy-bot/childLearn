@@ -92,6 +92,7 @@ export interface LearnerSkillRefinement {
 export interface ProfileRefinement {
   schemaVersion: 'childlearn.profile-refinement.v1';
   confidence: number;
+  globalDeltaTheta?: number;
   skillAdjustments: LearnerSkillRefinement[];
   errorPatterns: Array<{
     type: LearnerErrorPatternType;
@@ -105,6 +106,15 @@ export interface ProfileRefinement {
     reason: string;
   };
   safetyNotes: string[];
+}
+
+export interface ColdStartBaselineAssessment {
+  schemaVersion: 'childlearn.cold-start-baseline.v1';
+  confidence: number;
+  baselineTheta: Record<LearnerSkillKey, number>;
+  recommendedDifficulty: number;
+  notes: string[];
+  nextSkill?: LearnerSkillKey;
 }
 
 export interface LearnerProfile {
@@ -870,6 +880,9 @@ export function parseProfileRefinement(value: unknown): ProfileRefinement | null
   return {
     schemaVersion: 'childlearn.profile-refinement.v1',
     confidence: Number(value.confidence),
+    globalDeltaTheta: Number.isFinite(Number(value.globalDeltaTheta))
+      ? clamp(Number(value.globalDeltaTheta), -0.5, 0.5)
+      : undefined,
     skillAdjustments,
     errorPatterns,
     nextSkill,
@@ -904,6 +917,32 @@ export function applyProfileRefinement(
   }
 
   const skills = { ...normalized.skills };
+  if (Number.isFinite(refinement.globalDeltaTheta)) {
+    const globalWeight = refinementInfluence * 0.8;
+    LEARNER_SKILL_KEYS.forEach((skillKey) => {
+      const previous = skills[skillKey];
+      const readinessWeight =
+        previous.attempts > 0 || previous.confidence >= INITIAL_CONFIDENCE ? 1 : 0.72;
+      skills[skillKey] = {
+        ...previous,
+        theta: round(
+          clamp(
+            previous.theta + refinement.globalDeltaTheta! * globalWeight * readinessWeight,
+            THETA_MIN,
+            THETA_MAX,
+          ),
+        ),
+        confidence: round(
+          clamp(
+            previous.confidence + 0.03 * globalWeight * readinessWeight,
+            0,
+            0.99,
+          ),
+        ),
+        lastSeen: Math.max(previous.lastSeen, now),
+      };
+    });
+  }
   refinement.skillAdjustments.forEach((adjustment) => {
     const previous = skills[adjustment.skillKey];
     const weight = evidenceWeight(adjustment.evidenceStrength) * refinementInfluence;
@@ -951,6 +990,75 @@ export function applyProfileRefinement(
     recommendedSkill: shouldPreferLlmChoice(refinement.confidence, 0.3)
       ? refinement.nextSkill?.skillKey ?? normalized.recommendedSkill
       : normalized.recommendedSkill,
+    llmUpdatedAt: now,
+    updatedAt: now,
+  };
+}
+
+export function applyColdStartBaseline(
+  profile: LearnerProfile,
+  assessment: ColdStartBaselineAssessment,
+  now = Date.now(),
+): LearnerProfile {
+  const normalized = normalizeProfile(profile);
+  const influence = llmConfidenceWeight(assessment.confidence, {
+    minConfidence: 0.15,
+    fullConfidence: 0.85,
+    maxInfluence: 1,
+  });
+
+  if (influence === 0) {
+    return normalized;
+  }
+
+  const totalAttempts = Object.values(normalized.skills).reduce(
+    (sum, skill) => sum + skill.attempts,
+    0,
+  );
+  const exactMode = totalAttempts === 0;
+  const skills = LEARNER_SKILL_KEYS.reduce(
+    (nextSkills, skillKey) => {
+      const previous = normalized.skills[skillKey];
+      const targetTheta = clamp(
+        assessment.baselineTheta[skillKey] ?? previous.theta,
+        THETA_MIN,
+        THETA_MAX,
+      );
+      const blendWeight = exactMode
+        ? 1
+        : clamp(
+            influence * (previous.attempts === 0 ? 0.75 : 0.45),
+            0.25,
+            0.8,
+          );
+      const theta = exactMode
+        ? targetTheta
+        : previous.theta * (1 - blendWeight) + targetTheta * blendWeight;
+      const confidenceFloor = exactMode ? 0.3 : 0.22;
+
+      return {
+        ...nextSkills,
+        [skillKey]: {
+          ...previous,
+          theta: round(theta),
+          confidence: round(
+            clamp(
+              Math.max(previous.confidence, confidenceFloor + influence * 0.35),
+              0,
+              0.99,
+            ),
+          ),
+          lastSeen: Math.max(previous.lastSeen, now),
+        },
+      };
+    },
+    {} as Record<LearnerSkillKey, LearnerSkillState>,
+  );
+
+  return {
+    ...normalized,
+    skills,
+    recommendedSkill: assessment.nextSkill ?? normalized.recommendedSkill,
     llmUpdatedAt: now,
     updatedAt: now,
   };

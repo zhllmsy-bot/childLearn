@@ -1,5 +1,5 @@
 import type { ProfileRefinement } from '../../ai/learnerModel';
-import type { QuestionVariant } from '../../curriculum/types';
+import type { QuestionReasoningStrategy, QuestionVariant } from '../../curriculum/types';
 
 export type FlowState = 'easy' | 'flow' | 'stretch' | 'hard' | 'fatigue';
 
@@ -59,6 +59,12 @@ export interface QuestionAttemptRecord {
   feedbackInterruptClickCount: number;
   abandoned: boolean;
   result: 'correct' | 'wrong_first_then_correct' | 'wrong_final' | 'abandoned';
+  strategyUse?: {
+    attemptedStrategy: QuestionReasoningStrategy;
+    stepsCorrect: boolean[];
+    totalSteps: number;
+    narrationChoice?: string;
+  };
 }
 
 export interface BatchSummarySlice {

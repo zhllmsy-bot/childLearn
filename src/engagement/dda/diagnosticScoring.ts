@@ -16,20 +16,20 @@ export function scoreDiagnosticAttempts(records: QuestionAttemptRecord[]): Diagn
     (record) => record.hintCount > 0 || record.firstResponseTimeMs >= 8000,
   ).length;
 
-  if (firstTryCorrectCount >= 3 && slowOrSupportedCount === 0) {
+  if (firstTryCorrectCount >= 4 && slowOrSupportedCount <= 1) {
     return {
       correctCount,
       firstTryCorrectCount,
-      recommendedDifficulty: 5,
+      recommendedDifficulty: 6,
       readinessLabel: 'challenge',
     };
   }
 
-  if (correctCount >= 2 && firstTryCorrectCount >= 1) {
+  if (correctCount >= 3 && firstTryCorrectCount >= 2) {
     return {
       correctCount,
       firstTryCorrectCount,
-      recommendedDifficulty: 3,
+      recommendedDifficulty: 4,
       readinessLabel: 'core',
     };
   }
@@ -37,7 +37,7 @@ export function scoreDiagnosticAttempts(records: QuestionAttemptRecord[]): Diagn
   return {
     correctCount,
     firstTryCorrectCount,
-    recommendedDifficulty: 1,
+    recommendedDifficulty: 2,
     readinessLabel: 'support',
   };
 }

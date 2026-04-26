@@ -1,6 +1,14 @@
 import { useCallback, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import { requestStoryPolish } from '../../ai/api/childlearnAi';
+import {
+  buildAdaptiveQuestionPayload,
+  requestColdStartProbeQuestion,
+  requestCoPilotQuestion,
+  requestCrossTenQuestion,
+  requestStoryPolish,
+} from '../../ai/api/childlearnAi';
+import { buildColdStartProbePayload } from '../../ai/coldStartAgent';
+import { llmConfidenceWeight } from '../../ai/llmConfidence';
 import type { LearnerProfile, ProfileRefinement } from '../../ai/learnerModel';
 import { generateQuestion } from '../../curriculum/questionFactory';
 import {
@@ -31,6 +39,7 @@ import {
   type LlmLearningObservation,
   type QuestionAttemptRecord,
 } from '../../engagement/flow';
+import { fingerprintStem } from '../../engagement/flow/fingerprint';
 import { track } from '../../telemetry/track';
 
 interface DifficultyController {
@@ -78,6 +87,21 @@ function shouldTryStoryPolish(question: Question, serial: number) {
   return question.variant === 'story' && question.source === 'pcg' && serial % 3 === 1;
 }
 
+function stemForQuestion(question: Question) {
+  const prompt = question.prompt.trim();
+  const expression = question.expression.trim();
+
+  if (question.variant === 'story') {
+    return prompt || expression;
+  }
+
+  return expression || prompt;
+}
+
+function questionFingerprint(question: Question) {
+  return fingerprintStem(stemForQuestion(question));
+}
+
 function buildStoryPolishPayload(question: Question) {
   const [first, second] = question.barModel;
   if (
@@ -95,6 +119,43 @@ function buildStoryPolishPayload(question: Question) {
     first,
     second,
   };
+}
+
+function coPilotAcceptance({
+  confidence,
+  estimatedTheta,
+  fingerprint,
+  recentFingerprints,
+  targetTheta,
+}: {
+  confidence: number;
+  estimatedTheta: number | null;
+  fingerprint: string;
+  recentFingerprints: string[];
+  targetTheta?: number;
+}) {
+  if (recentFingerprints.includes(fingerprint)) {
+    return { accepted: false, reason: 'duplicate_fingerprint' } as const;
+  }
+
+  if (
+    targetTheta !== undefined &&
+    estimatedTheta !== null &&
+    Math.abs(estimatedTheta - targetTheta) > 0.25
+  ) {
+    return { accepted: false, reason: 'target_theta_miss' } as const;
+  }
+
+  const confidenceWeight = llmConfidenceWeight(confidence, {
+    minConfidence: 0.35,
+    fullConfidence: 0.8,
+    maxInfluence: 1,
+  });
+  if (confidenceWeight < 0.45) {
+    return { accepted: false, reason: 'low_confidence' } as const;
+  }
+
+  return { accepted: true, reason: 'accepted' } as const;
 }
 
 export function useFlowObserver({
@@ -158,6 +219,35 @@ export function useFlowObserver({
 
   const loadAdaptiveQuestion = useCallback(async (difficulty: number, serial: number) => {
     if (currentRunModeRef.current === 'diagnostic' && serial < DIAGNOSTIC_QUESTION_COUNT) {
+      const coldStartPayload = buildColdStartProbePayload({
+        ageMonths: 60,
+        records: questionHistoryRef.current,
+        serial,
+        totalProbes: DIAGNOSTIC_QUESTION_COUNT,
+      });
+      const probeResult = await requestColdStartProbeQuestion(coldStartPayload);
+      if (probeResult?.question) {
+        track('diagnostic.probe_question', {
+          confidence: probeResult.confidence,
+          estimatedTheta: probeResult.estimatedTheta,
+          probeIndex: coldStartPayload.probeIndex,
+          questionId: probeResult.question.id,
+          remainingProbes: coldStartPayload.remainingProbes,
+          source: 'llm',
+          variant: probeResult.question.variant,
+        });
+        return probeResult.question;
+      }
+
+      track('diagnostic.probe_question', {
+        confidence: null,
+        estimatedTheta: null,
+        probeIndex: coldStartPayload.probeIndex,
+        questionId: null,
+        remainingProbes: coldStartPayload.remainingProbes,
+        source: 'fallback',
+        variant: null,
+      });
       return getDiagnosticQuestion(serial, diagnosticRunSeedRef.current ?? 1);
     }
 
@@ -214,51 +304,151 @@ export function useFlowObserver({
           flowVariant: plan.variant,
         })
       : null;
+    const effectiveDifficulty = packPlan?.difficulty ?? plan.difficulty;
+    const effectiveVariant = packPlan?.variant ?? plan.variant;
+    const buildFallbackQuestion = async () => {
+      const question = generateQuestion({
+        childId: learnerProfileRef.current?.childId ?? 'local-child',
+        difficulty: effectiveDifficulty,
+        goldenMode: 'eligible',
+        parentItemMode: 'eligible',
+        parentItems: readParentItemsFromStorage(),
+        serial,
+        targetSkillKey: plan.targetSkillKey,
+        variant: effectiveVariant,
+      });
+      if (!shouldTryStoryPolish(question, serial)) {
+        return question;
+      }
 
-    const question = generateQuestion({
-      childId: learnerProfileRef.current?.childId ?? 'local-child',
-      difficulty: packPlan?.difficulty ?? plan.difficulty,
-      goldenMode: 'eligible',
-      parentItemMode: 'eligible',
-      parentItems: readParentItemsFromStorage(),
+      const storyPayload = buildStoryPolishPayload(question);
+      if (!storyPayload) {
+        track('question.story_polish', {
+          questionId: question.id,
+          result: 'skipped_invalid_skeleton',
+          serial,
+        });
+        return question;
+      }
+
+      const polishedPrompt = await requestStoryPolish(storyPayload);
+      if (!polishedPrompt || polishedPrompt === question.prompt) {
+        track('question.story_polish', {
+          questionId: question.id,
+          result: polishedPrompt ? 'unchanged' : 'fallback',
+          serial,
+        });
+        return question;
+      }
+
+      track('question.story_polish', {
+        questionId: question.id,
+        result: 'applied',
+        serial,
+      });
+      return {
+        ...question,
+        prompt: polishedPrompt,
+        source: 'pcg+llm' as const,
+      };
+    };
+    const coPilotPayload = buildAdaptiveQuestionPayload({
+      difficulty: effectiveDifficulty,
+      history: questionHistoryRef.current,
+      lane: plan.lane,
+      learnerProfile: learnerProfileRef.current,
+      reasoningMode: plan.reasoningMode,
       serial,
       targetSkillKey: plan.targetSkillKey,
-      variant: packPlan?.variant ?? plan.variant,
+      targetTheta: plan.targetTheta,
+      variant: effectiveVariant,
     });
-    if (!shouldTryStoryPolish(question, serial)) {
-      return question;
-    }
+    if (plan.targetSkillKey === 'crossTenBridge' && plan.reasoningMode === 'multiStep') {
+      const crossTenResult = await requestCrossTenQuestion(coPilotPayload);
+      if (crossTenResult) {
+        const fingerprint = questionFingerprint(crossTenResult.question);
+        const acceptance = coPilotAcceptance({
+          confidence: crossTenResult.confidence,
+          estimatedTheta: crossTenResult.estimatedTheta,
+          fingerprint,
+          recentFingerprints: coPilotPayload.recentFingerprints,
+          targetTheta: coPilotPayload.target.targetTheta,
+        });
 
-    const payload = buildStoryPolishPayload(question);
-    if (!payload) {
-      track('question.story_polish', {
-        questionId: question.id,
-        result: 'skipped_invalid_skeleton',
-        serial,
+        track('question.cross_ten_co_pilot', {
+          confidence: crossTenResult.confidence,
+          estimatedTheta: crossTenResult.estimatedTheta,
+          lane: plan.lane,
+          questionId: crossTenResult.question.id,
+          reason: acceptance.reason,
+          serial,
+          source: acceptance.accepted ? 'llm' : 'fallback',
+          targetSkillKey: plan.targetSkillKey,
+          targetTheta: coPilotPayload.target.targetTheta,
+          variant: crossTenResult.question.variant,
+        });
+
+        if (acceptance.accepted) {
+          return crossTenResult.question;
+        }
+      } else {
+        track('question.cross_ten_co_pilot', {
+          confidence: null,
+          estimatedTheta: null,
+          lane: plan.lane,
+          questionId: null,
+          reason: 'no_response',
+          serial,
+          source: 'fallback',
+          targetSkillKey: plan.targetSkillKey,
+          targetTheta: coPilotPayload.target.targetTheta,
+          variant: effectiveVariant ?? null,
+        });
+      }
+    }
+    const coPilotResult = await requestCoPilotQuestion(coPilotPayload);
+    if (coPilotResult) {
+      const fingerprint = questionFingerprint(coPilotResult.question);
+      const acceptance = coPilotAcceptance({
+        confidence: coPilotResult.confidence,
+        estimatedTheta: coPilotResult.estimatedTheta,
+        fingerprint,
+        recentFingerprints: coPilotPayload.recentFingerprints,
+        targetTheta: coPilotPayload.target.targetTheta,
       });
-      return question;
-    }
 
-    const polishedPrompt = await requestStoryPolish(payload);
-    if (!polishedPrompt || polishedPrompt === question.prompt) {
-      track('question.story_polish', {
-        questionId: question.id,
-        result: polishedPrompt ? 'unchanged' : 'fallback',
+      track('question.co_pilot', {
+        confidence: coPilotResult.confidence,
+        estimatedTheta: coPilotResult.estimatedTheta,
+        lane: plan.lane,
+        questionId: coPilotResult.question.id,
+        reason: acceptance.reason,
         serial,
+        source: acceptance.accepted ? 'llm' : 'fallback',
+        targetSkillKey: plan.targetSkillKey ?? null,
+        targetTheta: coPilotPayload.target.targetTheta,
+        variant: coPilotResult.question.variant,
       });
-      return question;
+
+      if (acceptance.accepted) {
+        return coPilotResult.question;
+      }
+    } else {
+      track('question.co_pilot', {
+        confidence: null,
+        estimatedTheta: null,
+        lane: plan.lane,
+        questionId: null,
+        reason: 'no_response',
+        serial,
+        source: 'fallback',
+        targetSkillKey: plan.targetSkillKey ?? null,
+        targetTheta: coPilotPayload.target.targetTheta,
+        variant: effectiveVariant ?? null,
+      });
     }
 
-    track('question.story_polish', {
-      questionId: question.id,
-      result: 'applied',
-      serial,
-    });
-    return {
-      ...question,
-      prompt: polishedPrompt,
-      source: 'pcg+llm' as const,
-    };
+    return buildFallbackQuestion();
   }, [activeLevelPackIdRef, learnerProfileRef, questionHistoryRef, reviewQueueRef]);
 
   const clearFlowState = useCallback(() => {
