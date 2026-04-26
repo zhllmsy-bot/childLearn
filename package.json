@@ -12,6 +12,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "lint": "tsc --noEmit --pretty false",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
     "metrics:flow": "node tools/analyze_flow_metrics.mjs",
     "voice:setup": "python3 -m pip install --no-cache-dir -r requirements-voice.txt",
     "voice:serve": "python3 tools/edge_tts_server.py",
@@ -33,14 +35,24 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@storybook/addon-essentials": "^8.6.14",
+    "@storybook/react-vite": "^8.6.14",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^25.6.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "autoprefixer": "^10.4.20",
+    "axe-core": "^4.11.3",
+    "jsdom": "^29.0.2",
+    "playwright": "^1.59.1",
     "postcss": "^8.4.49",
+    "storybook": "^8.6.14",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "vitest-axe": "^0.1.0"
   }
 }

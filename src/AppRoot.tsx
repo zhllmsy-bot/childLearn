@@ -1782,22 +1782,24 @@ export default function AppRoot() {
   return (
     <main
       ref={mainRef}
-      className="app-shell relative overflow-x-hidden overflow-y-auto overscroll-y-contain"
+      className={`app-shell relative overflow-x-hidden overflow-y-auto overscroll-y-contain ${
+        scene === 'programming' ? 'app-shell-programming' : ''
+      }`}
       style={gradientStyle(currentSkin.gradient || BG.mint)}
     >
-      <TopBar
-        themeName={
-          scene === 'literacy'
-            ? '识字乐园'
-            : scene === 'english'
-              ? '英语乐园'
-              : scene === 'programming'
-                ? '编程馆'
-              : `${currentSkin.name}摘果`
-        }
-        onHome={handleHome}
-        onSound={handleSound}
-      />
+      {scene !== 'programming' ? (
+        <TopBar
+          themeName={
+            scene === 'literacy'
+              ? '识字乐园'
+              : scene === 'english'
+                ? '英语乐园'
+                : `${currentSkin.name}摘果`
+          }
+          onHome={handleHome}
+          onSound={handleSound}
+        />
+      ) : null}
       {scene === 'practice' ? <FeedbackBadge level={feedback} /> : null}
       {scene === 'practice' ? <ComboBanner combo={combo.current} /> : null}
 
@@ -1908,7 +1910,9 @@ export default function AppRoot() {
       </AnimatePresence>
       </Suspense>
 
-      <LongPressGate onOpen={() => setParentReportOpen(true)} />
+      {scene !== 'programming' ? (
+        <LongPressGate onOpen={() => setParentReportOpen(true)} />
+      ) : null}
 
       <AnimatePresence>
         {selectedSticker ? (

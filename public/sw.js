@@ -1,4 +1,4 @@
-const CACHE_NAME = 'childlearn-shell-v3-20260425';
+const CACHE_NAME = 'childlearn-shell-v4-20260426';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -12,6 +12,10 @@ const SHELL_ASSETS = [
   '/characters/xiaoman/happy.svg',
   '/characters/xiaoman/thinking.svg',
   '/characters/xiaoman/cheer.svg',
+  '/programming/stone.svg',
+  '/programming/stone-hit.svg',
+  '/programming/gem.svg',
+  '/programming/flag.svg',
 ];
 
 self.addEventListener('install', (event) => {

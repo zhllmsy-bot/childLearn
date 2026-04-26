@@ -1,0 +1,1 @@
+export const PROGRAMMING_UI_SPEC_VERSION = '2.0.0';
