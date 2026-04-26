@@ -10,7 +10,7 @@ export function buildMissingQuestion(
   return {
     id: `missing-${level}-${first}-${sum}`,
     level,
-    source: 'template',
+    source: 'pcg',
     variant: 'missing',
     factId: `${first}+${missing}`,
     prompt: '空格里应该放几？',

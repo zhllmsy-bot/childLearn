@@ -1,3 +1,4 @@
+import type { LearnerSkillKey } from '../../ai/learnerModel';
 import { generateQuestion } from '../questionFactory';
 import type { Question, QuestionVariant } from '../types';
 
@@ -8,6 +9,7 @@ interface DiagnosticQuestionPlan {
   variant: QuestionVariant;
   difficulty: number;
   serial: number;
+  skill: LearnerSkillKey;
 }
 
 export interface DiagnosticSnapshot {
@@ -20,9 +22,9 @@ export interface DiagnosticSnapshot {
 }
 
 const DIAGNOSTIC_PLAN: DiagnosticQuestionPlan[] = [
-  { variant: 'numberLine', difficulty: 3, serial: 0 },
-  { variant: 'compare', difficulty: 2, serial: 1 },
-  { variant: 'makeTen', difficulty: 4, serial: 2 },
+  { variant: 'numberLine', difficulty: 3, serial: 0, skill: 'numberLineDistance' },
+  { variant: 'compare', difficulty: 2, serial: 1, skill: 'compareWithin5' },
+  { variant: 'makeTen', difficulty: 4, serial: 2, skill: 'makeTen' },
 ];
 
 function normalizeSeed(seed: number) {
@@ -62,7 +64,10 @@ export function getDiagnosticQuestion(serial: number, runSeed = 1): Question {
   const questionSerial = plan.serial + serial + (safeSeed % 997);
   const question = generateQuestion({
     difficulty: plan.difficulty,
+    goldenMode: 'required',
+    goldenTags: ['diagnostic'],
     serial: questionSerial,
+    targetSkillKey: plan.skill,
     variant: plan.variant,
     rng: createSeededRng(safeSeed + serial * 101 + plan.difficulty * 17),
   });

@@ -20,16 +20,20 @@ function attempt(
   const finalCorrect = overrides.finalCorrect ?? true;
   const firstAttemptCorrect = overrides.firstAttemptCorrect ?? finalCorrect;
 
-  return {
+  const base: QuestionAttemptRecord = {
     questionId: `q-${questionIndex}`,
     questionIndex,
     tags: BASE_TAGS,
+    stem: `${questionIndex + 1} + 1 = ?`,
+    choices: ['2', '3', '4', '5'],
     correctAnswer: 5,
+    childAnswer: finalCorrect ? '5' : '4',
     firstSelectedAnswer: firstAttemptCorrect ? 5 : 4,
     finalSelectedAnswer: finalCorrect ? 5 : 4,
     firstAttemptCorrect,
     finalCorrect,
     attemptCount: firstAttemptCorrect ? 1 : 2,
+    reactionTimeMs: 3000,
     firstResponseTimeMs: 3000,
     totalTimeMs: firstAttemptCorrect ? 3500 : 7000,
     audioReplayCount: 0,
@@ -43,8 +47,9 @@ function attempt(
       : finalCorrect
         ? 'wrong_first_then_correct'
         : 'wrong_final',
-    ...overrides,
   };
+
+  return { ...base, ...overrides };
 }
 
 function reportFrom(attempts: QuestionAttemptRecord[]) {

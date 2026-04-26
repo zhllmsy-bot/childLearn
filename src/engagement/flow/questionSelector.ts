@@ -154,51 +154,26 @@ function learnerPlanAdjustment({
   };
 }
 
-export function selectFlowQuestionPlan({
+export function buildFlowQuestionPlanForLane({
   learnerProfile,
   policy,
   fallbackDifficulty,
   serial,
-}: SelectFlowQuestionPlanInput): FlowQuestionPlan {
-  if (!policy) {
-    const fallback = clampDifficulty(fallbackDifficulty);
-    const learnerAdjustment = learnerPlanAdjustment({
-      baselineDifficulty: fallback,
-      lane: 'current',
-      learnerProfile,
-    });
-    const plan: FlowQuestionPlan = {
-      lane: 'current',
-      difficulty: learnerAdjustment.difficulty,
-    };
-
-    if (learnerAdjustment.targetSkillKey) {
-      plan.targetSkillKey = learnerAdjustment.targetSkillKey;
-      plan.targetTheta = learnerAdjustment.targetTheta;
-    }
-
-    if (learnerAdjustment.variant) {
-      plan.variant = learnerAdjustment.variant;
-    }
-
-    return plan;
-  }
-
-  const lanes = laneSequence(policy);
-  const lane = lanes[serial % lanes.length];
-  const baselineDifficulty = difficultyForLane(lane, policy);
+  lane,
+}: SelectFlowQuestionPlanInput & { lane: FlowQuestionLane }): FlowQuestionPlan {
+  const baselineDifficulty = policy
+    ? difficultyForLane(lane, policy)
+    : clampDifficulty(fallbackDifficulty);
   const learnerAdjustment = learnerPlanAdjustment({
     baselineDifficulty,
     lane,
     learnerProfile,
   });
   const difficulty = learnerAdjustment.difficulty;
-
   const plan: FlowQuestionPlan = {
     lane,
     difficulty,
-    variant:
-      learnerAdjustment.variant ?? variantForLane(lane, serial, difficulty),
+    variant: learnerAdjustment.variant ?? variantForLane(lane, serial, difficulty),
   };
 
   if (learnerAdjustment.targetSkillKey) {
@@ -207,4 +182,31 @@ export function selectFlowQuestionPlan({
   }
 
   return plan;
+}
+
+export function selectFlowQuestionPlan({
+  learnerProfile,
+  policy,
+  fallbackDifficulty,
+  serial,
+}: SelectFlowQuestionPlanInput): FlowQuestionPlan {
+  if (!policy) {
+    return buildFlowQuestionPlanForLane({
+      learnerProfile,
+      policy,
+      fallbackDifficulty,
+      serial,
+      lane: 'current',
+    });
+  }
+
+  const lanes = laneSequence(policy);
+  const lane = lanes[serial % lanes.length];
+  return buildFlowQuestionPlanForLane({
+    learnerProfile,
+    policy,
+    fallbackDifficulty,
+    serial,
+    lane,
+  });
 }

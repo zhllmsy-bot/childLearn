@@ -40,12 +40,16 @@ export interface QuestionAttemptRecord {
   questionId: string;
   questionIndex: number;
   tags: QuestionDifficultyTags;
+  stem: string;
+  choices?: string[];
   correctAnswer: number;
+  childAnswer: string;
   firstSelectedAnswer: number | null;
   finalSelectedAnswer: number | null;
   firstAttemptCorrect: boolean;
   finalCorrect: boolean;
   attemptCount: number;
+  reactionTimeMs: number;
   firstResponseTimeMs: number;
   totalTimeMs: number;
   audioReplayCount: number;

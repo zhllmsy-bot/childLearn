@@ -1,5 +1,6 @@
 export { createLearningBatchReport } from './batchAnalyzer';
 export { deriveQuestionDifficultyTags } from './questionTags';
+export { blendBatchMix, composeFlowPlan } from './flowComposer';
 export { selectFlowQuestionPlan } from './questionSelector';
 export type { FlowQuestionLane, FlowQuestionPlan } from './questionSelector';
 export { observeLearningBatch, parseLlmLearningObservation } from './llmObserver';

@@ -75,8 +75,13 @@ const FLOW_OBSERVER_STATUS_LABELS: Record<string, string> = {
 };
 
 const QUESTION_SOURCE_LABELS: Record<Question['source'], string> = {
+  golden: '金标准题库',
   llm: '协作助手现生成',
-  template: '保底题库模板',
+  'pcg+llm': '程序骨架 + AI 润色',
+  pcg: '程序生成题库',
+  parent: '家长私密题',
+  teacher: '老师私密题',
+  template: '旧版保底模板',
 };
 
 const FLOW_ISSUE_LABELS: Record<string, string> = {
@@ -498,14 +503,34 @@ export function ParentReportPanel({
                           当前先由本地能力模型和保底题库继续陪练，等协作助手恢复后会重新参与出题和摘要。
                         </p>
                       ) : null}
+                      {questionSource === 'pcg' ? (
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
+                          这一题由程序先算出数学骨架和干扰项，保证正确性和出题速度。
+                        </p>
+                      ) : null}
+                      {questionSource === 'pcg+llm' ? (
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
+                          这一题先由程序确定数学骨架，再由协作助手只润色故事文案，不参与算数。
+                        </p>
+                      ) : null}
                       {flowObserverStatus === 'ready' && questionSource === 'template' ? (
                         <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
-                          这一题回退到了保底题库，避免在 AI 不稳定时打断孩子的节奏。
+                          这一题来自旧版保底模板，会逐步被新的程序生成题替换。
+                        </p>
+                      ) : null}
+                      {questionSource === 'golden' ? (
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
+                          这一题来自教研审核通过的金标准题库，主要用于诊断、里程碑和高价值情境题。
+                        </p>
+                      ) : null}
+                      {questionSource === 'parent' || questionSource === 'teacher' ? (
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
+                          这一题来自私密题库，只在当前孩子或班级范围内使用，不会自动进入公共题库。
                         </p>
                       ) : null}
                       {flowObserverStatus === 'ready' && questionSource === 'llm' ? (
                         <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
-                          这一题由协作助手按当前能力区间现生成，再由安全策略做最后把关。
+                          这一题由协作助手完整生成，当前主要保留给实验和兜底链路使用。
                         </p>
                       ) : null}
                     </div>

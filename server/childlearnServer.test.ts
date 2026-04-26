@@ -24,6 +24,110 @@ describe('childlearnServer', () => {
     });
   });
 
+  it('gracefully degrades story polish when AI is unconfigured', async () => {
+    const result = await executeAiAction('story-polish', {
+      answer: 7,
+      currentPrompt: '小熊有 3 个饼干，朋友又送来 4 个，现在有几个饼干？',
+      expression: '3 + 4 = ?',
+      first: 3,
+      second: 4,
+    });
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        prompt: null,
+        reason: 'ai_unconfigured',
+      },
+    });
+  });
+
+  it('accepts validated story polish prompts that preserve the math skeleton', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  prompt: '小熊装了 3 个饼干，妈妈又放来 4 个，现在有几个饼干？',
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await executeAiAction(
+      'story-polish',
+      {
+        answer: 7,
+        currentPrompt: '小熊有 3 个饼干，朋友又送来 4 个，现在有几个饼干？',
+        expression: '3 + 4 = ?',
+        first: 3,
+        second: 4,
+      },
+      {
+        env: {
+          CHILDLEARN_AI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        prompt: '小熊装了 3 个饼干，妈妈又放来 4 个，现在有几个饼干？',
+      },
+    });
+  });
+
+  it('rejects story polish prompts that sneak in extra numbers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  prompt: '小猫拿了 3 个气球，朋友又送来 5 个，一共有 8 个吗？',
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await executeAiAction(
+      'story-polish',
+      {
+        answer: 8,
+        currentPrompt: '小猫有 3 个气球，朋友又送来 5 个，现在有几个气球？',
+        expression: '3 + 5 = ?',
+        first: 3,
+        second: 5,
+      },
+      {
+        env: {
+          CHILDLEARN_AI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: 502,
+      body: {
+        error: 'invalid_story_polish_payload',
+      },
+    });
+  });
+
   it('treats telemetry as a no-op when no upstream is configured', async () => {
     const result = await proxyTelemetry({
       name: 'question.show',

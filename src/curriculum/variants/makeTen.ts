@@ -9,7 +9,7 @@ export function buildMakeTenQuestion(
   return {
     id: `make-ten-${level}-${start}`,
     level,
-    source: 'template',
+    source: 'pcg',
     variant: 'makeTen',
     factId: `make-ten-${start}`,
     prompt: '再摘几个可以凑成 10？',

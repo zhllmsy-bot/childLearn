@@ -3,7 +3,7 @@ import type { QuestionAttemptRecord } from '../flow';
 import { scoreDiagnosticAttempts } from './diagnosticScoring';
 
 function record(overrides: Partial<QuestionAttemptRecord>): QuestionAttemptRecord {
-  return {
+  const base: QuestionAttemptRecord = {
     questionId: 'q',
     questionIndex: 0,
     tags: {
@@ -16,12 +16,16 @@ function record(overrides: Partial<QuestionAttemptRecord>): QuestionAttemptRecor
       carryOrBorrow: false,
       difficultyLevel: 3,
     },
+    stem: '1 + 0 = ?',
+    choices: ['0', '1', '2', '3'],
     correctAnswer: 1,
+    childAnswer: '1',
     firstSelectedAnswer: 1,
     finalSelectedAnswer: 1,
     firstAttemptCorrect: true,
     finalCorrect: true,
     attemptCount: 1,
+    reactionTimeMs: 3000,
     firstResponseTimeMs: 3000,
     totalTimeMs: 4000,
     audioReplayCount: 0,
@@ -31,8 +35,9 @@ function record(overrides: Partial<QuestionAttemptRecord>): QuestionAttemptRecor
     feedbackInterruptClickCount: 0,
     abandoned: false,
     result: 'correct',
-    ...overrides,
   };
+
+  return { ...base, ...overrides };
 }
 
 describe('scoreDiagnosticAttempts', () => {

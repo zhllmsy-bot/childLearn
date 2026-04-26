@@ -11,7 +11,7 @@ import {
 function attempt(
   partial: Partial<QuestionAttemptRecord> = {},
 ): QuestionAttemptRecord {
-  return {
+  const base: QuestionAttemptRecord = {
     questionId: 'make-ten-2-7',
     questionIndex: 0,
     tags: {
@@ -24,12 +24,16 @@ function attempt(
       optionDistance: 'close',
       difficultyLevel: 3,
     },
+    stem: '7 + 3 = ?',
+    choices: ['3', '9', '10', '11'],
     correctAnswer: 3,
+    childAnswer: '3',
     firstSelectedAnswer: 3,
     finalSelectedAnswer: 3,
     firstAttemptCorrect: true,
     finalCorrect: true,
     attemptCount: 1,
+    reactionTimeMs: 2200,
     firstResponseTimeMs: 2200,
     totalTimeMs: 2600,
     audioReplayCount: 0,
@@ -39,8 +43,9 @@ function attempt(
     feedbackInterruptClickCount: 0,
     abandoned: false,
     result: 'correct',
-    ...partial,
   };
+
+  return { ...base, ...partial };
 }
 
 describe('learnerModel', () => {
@@ -135,5 +140,39 @@ describe('learnerModel', () => {
     expect(profile.recommendedSkill).toBe('makeTen');
     expect(profile.errorPatterns[0]?.label).toBe('凑十拆分不稳');
   });
-});
 
+  it('blends lower-confidence LLM refinements instead of discarding them', () => {
+    const refinement = parseProfileRefinement({
+      schemaVersion: 'childlearn.profile-refinement.v1',
+      confidence: 0.4,
+      skillAdjustments: [
+        {
+          skillKey: 'makeTen',
+          deltaTheta: -0.9,
+          deltaConfidence: 0.2,
+          evidenceStrength: 'high',
+          reason: 'Some signs of make-ten confusion.',
+        },
+      ],
+      errorPatterns: [],
+      nextSkill: {
+        skillKey: 'makeTen',
+        difficultyAdjustment: 0.2,
+        reason: 'Stay nearby.',
+      },
+      safetyNotes: [],
+    });
+
+    expect(refinement).not.toBeNull();
+
+    const profile = applyProfileRefinement(
+      createEmptyLearnerProfile(),
+      refinement!,
+      3000,
+    );
+
+    expect(profile.skills.makeTen.theta).toBeLessThan(0);
+    expect(profile.skills.makeTen.theta).toBeGreaterThan(-0.25);
+    expect(profile.recommendedSkill).toBe('makeTen');
+  });
+});

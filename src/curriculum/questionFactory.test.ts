@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { buildOptions, generateQuestion } from './questionFactory';
+import type { ParentItem } from './parentItems/types';
 
 function fixedRng(value: number) {
   return () => value;
+}
+
+function sequenceRng(...values: number[]) {
+  let index = 0;
+  return () => {
+    const next = values[index] ?? values[values.length - 1] ?? 0;
+    index += 1;
+    return next;
+  };
 }
 
 describe('questionFactory', () => {
@@ -145,6 +155,7 @@ describe('questionFactory', () => {
     });
 
     expect(question.variant).toBe('story');
+    expect(question.source).toBe('pcg');
   });
 
   it('adds a visual theme for answer controls and representations', () => {
@@ -157,5 +168,84 @@ describe('questionFactory', () => {
 
     expect(question.theme?.emoji).toBe('🍓');
     expect(question.theme?.colorHint).toBe('pink');
+  });
+
+  it('builds story distractors from child-like error patterns instead of pure +/-1', () => {
+    const question = generateQuestion({
+      difficulty: 6,
+      serial: 0,
+      variant: 'story',
+      rng: fixedRng(0.999),
+    });
+    const [first, second] = question.barModel;
+    const values = question.options.map((option) => option.value);
+
+    expect(question.source).toBe('pcg');
+    expect(values).toContain(question.answer);
+    expect(values.some((value) => value === first || value === second)).toBe(true);
+    expect(values).toContain(question.answer - 1);
+  });
+
+  it('varies story framing and theme across the story pool', () => {
+    const firstStory = generateQuestion({
+      difficulty: 6,
+      serial: 0,
+      variant: 'story',
+      rng: sequenceRng(0.02, 0.02, 0.02),
+    });
+    const secondStory = generateQuestion({
+      difficulty: 6,
+      serial: 0,
+      variant: 'story',
+      rng: sequenceRng(0.98, 0.98, 0.98),
+    });
+
+    expect(firstStory.prompt).not.toBe(secondStory.prompt);
+    expect(firstStory.theme?.emoji).not.toBe(secondStory.theme?.emoji);
+  });
+
+  it('can force diagnostic items to come from the golden set', () => {
+    const question = generateQuestion({
+      difficulty: 4,
+      goldenMode: 'required',
+      goldenTags: ['diagnostic'],
+      serial: 2,
+      targetSkillKey: 'makeTen',
+      variant: 'makeTen',
+    });
+
+    expect(question.source).toBe('golden');
+    expect(question.id).toContain('gs_');
+  });
+
+  it('can inject private parent items on the configured cadence', () => {
+    const parentItem: ParentItem = {
+      id: 'pi_custom_001',
+      ownerId: 'parent-1',
+      childId: 'local-child',
+      prompt: '妈妈买了 2 个苹果，又买了 3 个，一共有几个？',
+      answer: 5,
+      distractors: [2, 3, 6],
+      difficulty: 3,
+      skill: 'addWithin5',
+      variant: 'story',
+      source: 'parent',
+      scope: 'child',
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    const question = generateQuestion({
+      childId: 'local-child',
+      difficulty: 3,
+      parentItemMode: 'eligible',
+      parentItems: [parentItem],
+      serial: 5,
+      variant: 'story',
+    });
+
+    expect(question.source).toBe('parent');
+    expect(question.prompt).toBe(parentItem.prompt);
   });
 });

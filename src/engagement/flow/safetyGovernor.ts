@@ -5,6 +5,8 @@ import type {
   LearningBatchReport,
   LlmLearningObservation,
 } from './types';
+import { llmConfidenceWeight } from '../../ai/llmConfidence';
+import { blendBatchMix } from './flowComposer';
 
 const DEFAULT_MIX_BY_STATE: Record<FlowState, BatchMix> = {
   easy: {
@@ -61,7 +63,7 @@ function observationState(
 ): FlowState | null {
   if (
     !observation ||
-    observation.confidence < 0.65 ||
+    llmConfidenceWeight(observation.confidence, { maxInfluence: 1 }) < 0.35 ||
     observation.overallState === 'unstable'
   ) {
     return null;
@@ -106,7 +108,11 @@ function withObservationRationale(
   rationale: string,
   observation?: LlmLearningObservation | null,
 ) {
-  if (!observation || observation.confidence < 0.65) {
+  if (
+    !observation ||
+    observation.overallState === 'unstable' ||
+    llmConfidenceWeight(observation.confidence, { maxInfluence: 1 }) === 0
+  ) {
     return rationale;
   }
 
@@ -121,7 +127,12 @@ export function approveFlowPolicy({
   const state = saferState(report.rulePreState, observationState(observation));
   const repeatedState = hasConsecutiveState(state, recentStates);
   const batchSize = state === 'fatigue' ? 6 : 10;
-  const mix = DEFAULT_MIX_BY_STATE[state];
+  const mix = blendBatchMix(
+    DEFAULT_MIX_BY_STATE[state],
+    observation?.recommendation.suggestedMix,
+    observation?.confidence ?? 0,
+    batchSize,
+  );
   const nextDifficulty =
     state === 'easy' && repeatedState
       ? clampDifficulty(report.currentDifficulty + 1)

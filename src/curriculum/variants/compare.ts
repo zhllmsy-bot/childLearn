@@ -10,7 +10,7 @@ export function buildCompareQuestion(
   return {
     id: `compare-${level}-${left}-${right}`,
     level,
-    source: 'template',
+    source: 'pcg',
     variant: 'compare',
     factId: `compare-${left}-${right}`,
     prompt: '哪一边的数量更大？',

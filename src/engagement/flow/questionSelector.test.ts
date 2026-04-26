@@ -36,7 +36,7 @@ describe('selectFlowQuestionPlan', () => {
         fallbackDifficulty: 3,
         serial: 0,
       }),
-    ).toEqual({
+    ).toMatchObject({
       lane: 'current',
       difficulty: 3,
     });

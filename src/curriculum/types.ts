@@ -1,4 +1,12 @@
 export type QuestionLevel = 1 | 2 | 3 | 4 | 5;
+export type QuestionSource =
+  | 'template'
+  | 'pcg'
+  | 'pcg+llm'
+  | 'llm'
+  | 'golden'
+  | 'parent'
+  | 'teacher';
 
 export type QuestionVariant =
   | 'matching'
@@ -23,7 +31,7 @@ export interface Question {
   id: string;
   level: QuestionLevel;
   variant: QuestionVariant;
-  source: 'template' | 'llm';
+  source: QuestionSource;
   factId: string;
   prompt: string;
   expression: string;

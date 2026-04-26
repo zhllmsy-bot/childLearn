@@ -2,6 +2,7 @@ import type {
   QuestionAttemptRecord,
   QuestionDifficultyTags,
 } from '../engagement/flow/types';
+import { llmConfidenceWeight, shouldPreferLlmChoice } from './llmConfidence';
 
 export const LEARNER_MODEL_SCHEMA_VERSION = 1;
 export const LEARNER_MODEL_STORAGE_KEY = 'childlearn.learner-model-v1';
@@ -63,10 +64,15 @@ export interface ErrorCluster {
 export interface LearnerResponseDigest {
   questionId: string;
   questionIndex: number;
+  stem: string;
+  choices?: string[];
+  correctAnswer: string;
+  childAnswer: string;
   skillKeys: LearnerSkillKey[];
   difficultyTheta: number;
   firstAttemptCorrect: boolean;
   finalCorrect: boolean;
+  reactionTimeMs: number;
   firstResponseTimeMs: number;
   hintCount: number;
   audioReplayCount: number;
@@ -278,6 +284,22 @@ function normalizeRecentResponses(value: unknown): LearnerResponseDigest[] {
       {
         questionId: item.questionId,
         questionIndex: Math.round(finiteNumber(item.questionIndex, 0)),
+        stem: typeof item.stem === 'string' ? item.stem.trim().slice(0, 80) : '',
+        choices: Array.isArray(item.choices)
+          ? item.choices
+              .filter((choice): choice is string => typeof choice === 'string')
+              .map((choice) => choice.trim())
+              .filter(Boolean)
+              .slice(0, 6)
+          : undefined,
+        correctAnswer:
+          typeof item.correctAnswer === 'string'
+            ? item.correctAnswer.trim().slice(0, 16)
+            : '',
+        childAnswer:
+          typeof item.childAnswer === 'string'
+            ? item.childAnswer.trim().slice(0, 16)
+            : '',
         skillKeys,
         difficultyTheta: clamp(
           finiteNumber(item.difficultyTheta, 0),
@@ -286,6 +308,15 @@ function normalizeRecentResponses(value: unknown): LearnerResponseDigest[] {
         ),
         firstAttemptCorrect: item.firstAttemptCorrect === true,
         finalCorrect: item.finalCorrect === true,
+        reactionTimeMs: Math.max(
+          0,
+          Math.round(
+            finiteNumber(
+              item.reactionTimeMs,
+              finiteNumber(item.firstResponseTimeMs, 0),
+            ),
+          ),
+        ),
         firstResponseTimeMs: Math.max(
           0,
           Math.round(finiteNumber(item.firstResponseTimeMs, 0)),
@@ -693,10 +724,15 @@ export function updateLearnerModel(
     {
       questionId: response.questionId,
       questionIndex: response.questionIndex,
+      stem: response.stem,
+      choices: response.choices,
+      correctAnswer: String(response.correctAnswer),
+      childAnswer: response.childAnswer,
       skillKeys,
       difficultyTheta,
       firstAttemptCorrect: response.firstAttemptCorrect,
       finalCorrect: response.finalCorrect,
+      reactionTimeMs: response.reactionTimeMs,
       firstResponseTimeMs: response.firstResponseTimeMs,
       hintCount: response.hintCount,
       audioReplayCount: response.audioReplayCount,
@@ -861,15 +897,16 @@ export function applyProfileRefinement(
   now = Date.now(),
 ): LearnerProfile {
   const normalized = normalizeProfile(profile);
+  const refinementInfluence = llmConfidenceWeight(refinement.confidence);
 
-  if (refinement.confidence < 0.65) {
+  if (refinementInfluence === 0) {
     return normalized;
   }
 
   const skills = { ...normalized.skills };
   refinement.skillAdjustments.forEach((adjustment) => {
     const previous = skills[adjustment.skillKey];
-    const weight = evidenceWeight(adjustment.evidenceStrength);
+    const weight = evidenceWeight(adjustment.evidenceStrength) * refinementInfluence;
     skills[adjustment.skillKey] = {
       ...previous,
       theta: round(
@@ -890,25 +927,30 @@ export function applyProfileRefinement(
     };
   });
 
-  const errorPatterns = refinement.errorPatterns.reduce((patterns, pattern) => {
-    const exampleId = pattern.evidenceQuestionIds?.[0] ?? `llm-${now}`;
-    return mergeErrorPattern(
-      patterns,
-      {
-        type: pattern.type,
-        label: pattern.label,
-        skillKey: pattern.skillKey,
-      },
-      exampleId,
-      now,
-    );
-  }, normalized.errorPatterns);
+  const errorPatterns =
+    refinementInfluence < 0.15
+      ? normalized.errorPatterns
+      : refinement.errorPatterns.reduce((patterns, pattern) => {
+          const exampleId = pattern.evidenceQuestionIds?.[0] ?? `llm-${now}`;
+          return mergeErrorPattern(
+            patterns,
+            {
+              type: pattern.type,
+              label: pattern.label,
+              skillKey: pattern.skillKey,
+            },
+            exampleId,
+            now,
+          );
+        }, normalized.errorPatterns);
 
   return {
     ...normalized,
     skills,
     errorPatterns,
-    recommendedSkill: refinement.nextSkill?.skillKey ?? normalized.recommendedSkill,
+    recommendedSkill: shouldPreferLlmChoice(refinement.confidence, 0.3)
+      ? refinement.nextSkill?.skillKey ?? normalized.recommendedSkill
+      : normalized.recommendedSkill,
     llmUpdatedAt: now,
     updatedAt: now,
   };

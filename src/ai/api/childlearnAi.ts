@@ -2,6 +2,10 @@ import type { LearnerProfile } from '../learnerModel';
 import type { LearningBatchReport } from '../../engagement/flow';
 import type { Question, QuestionVariant } from '../../curriculum/types';
 import {
+  buildAdaptiveQuestionPayload,
+  type AdaptiveQuestionPayload,
+} from '../../engagement/flow/buildAdaptiveQuestionPayload';
+import {
   resolveChildlearnEndpoint,
   resolveRuntimeUrl,
 } from '../../network/runtimeUrl';
@@ -12,8 +16,16 @@ const DEFAULT_AI_ACTIONS = {
   parentSummary: '/api/ai?action=parent-summary',
   programmingHint: '/api/ai?action=programming-hint',
   question: '/api/ai?action=question',
+  storyPolish: '/api/ai?action=story-polish',
 } as const;
 const DEFAULT_SYNC_ACTION = '/api/learning-sync';
+const AI_ACTION_QUERY_NAMES = {
+  observe: 'observe',
+  parentSummary: 'parent-summary',
+  programmingHint: 'programming-hint',
+  question: 'question',
+  storyPolish: 'story-polish',
+} as const;
 
 type ProgrammingHintPayload = {
   allowedCommands: string[];
@@ -43,27 +55,12 @@ type ParentSummaryPayload = {
   reviewQueueSize: number;
 };
 
-type AdaptiveQuestionPayload = {
-  difficulty: number;
-  lane: 'confidence' | 'review' | 'current' | 'challenge';
-  recentErrorPatterns: Array<{
-    count: number;
-    label: string;
-    skillKey: string;
-    type: string;
-  }>;
-  recentResponses: Array<{
-    difficultyTheta: number;
-    finalCorrect: boolean;
-    firstAttemptCorrect: boolean;
-    hintCount: number;
-    questionId: string;
-    skillKeys: string[];
-  }>;
-  serial: number;
-  targetSkillKey?: string;
-  targetTheta?: number;
-  variant?: QuestionVariant;
+type StoryPolishPayload = {
+  answer: number;
+  currentPrompt: string;
+  expression: string;
+  first: number;
+  second: number;
 };
 
 function aiBaseUrl() {
@@ -78,13 +75,7 @@ export function aiActionUrl(action: keyof typeof DEFAULT_AI_ACTIONS) {
 
   try {
     const url = new URL(baseUrl, window.location.origin);
-    const actionName =
-      action === 'parentSummary'
-        ? 'parent-summary'
-        : action === 'programmingHint'
-          ? 'programming-hint'
-          : action;
-    url.searchParams.set('action', actionName);
+    url.searchParams.set('action', AI_ACTION_QUERY_NAMES[action]);
     return url.pathname + url.search;
   } catch {
     return DEFAULT_AI_ACTIONS[action];
@@ -147,7 +138,13 @@ function isQuestion(value: unknown): value is Question {
     'variant' in value &&
     typeof value.variant === 'string' &&
     'source' in value &&
-    (value.source === 'template' || value.source === 'llm') &&
+    (value.source === 'template' ||
+      value.source === 'pcg' ||
+      value.source === 'pcg+llm' ||
+      value.source === 'llm' ||
+      value.source === 'golden' ||
+      value.source === 'parent' ||
+      value.source === 'teacher') &&
     'prompt' in value &&
     typeof value.prompt === 'string' &&
     'expression' in value &&
@@ -185,6 +182,13 @@ export async function requestProgrammingHint(
   return typeof result?.hint === 'string' ? result.hint : null;
 }
 
+export async function requestStoryPolish(
+  payload: StoryPolishPayload,
+): Promise<string | null> {
+  const result = await postJson<{ prompt?: unknown }>(aiActionUrl('storyPolish'), payload);
+  return typeof result?.prompt === 'string' ? result.prompt : null;
+}
+
 export async function requestParentSummary(
   payload: ParentSummaryPayload,
 ): Promise<string | null> {
@@ -195,45 +199,10 @@ export async function requestParentSummary(
   return typeof result?.summary === 'string' ? result.summary : null;
 }
 
-export function buildAdaptiveQuestionPayload({
-  difficulty,
-  lane,
-  learnerProfile,
-  serial,
-  targetSkillKey,
-  targetTheta,
-  variant,
-}: {
-  difficulty: number;
-  lane: 'confidence' | 'review' | 'current' | 'challenge';
-  learnerProfile?: LearnerProfile | null;
-  serial: number;
-  targetSkillKey?: string;
-  targetTheta?: number;
-  variant?: QuestionVariant;
-}): AdaptiveQuestionPayload {
-  return {
-    difficulty,
-    lane,
-    recentErrorPatterns: (learnerProfile?.errorPatterns ?? []).slice(-4).map((pattern) => ({
-      count: pattern.count,
-      label: pattern.label,
-      skillKey: pattern.skillKey,
-      type: pattern.type,
-    })),
-    recentResponses: (learnerProfile?.recentResponses ?? []).slice(-8).map((response) => ({
-      difficultyTheta: response.difficultyTheta,
-      finalCorrect: response.finalCorrect,
-      firstAttemptCorrect: response.firstAttemptCorrect,
-      hintCount: response.hintCount,
-      questionId: response.questionId,
-      skillKeys: response.skillKeys,
-    })),
-    serial,
-    targetSkillKey,
-    targetTheta,
-    variant,
-  };
-}
-
-export type { ParentSummaryPayload, ProgrammingHintPayload };
+export { buildAdaptiveQuestionPayload };
+export type {
+  AdaptiveQuestionPayload,
+  ParentSummaryPayload,
+  ProgrammingHintPayload,
+  StoryPolishPayload,
+};

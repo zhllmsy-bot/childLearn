@@ -8,7 +8,7 @@ export function buildMatchingQuestion(
   return {
     id: `matching-${level}-${count}`,
     level,
-    source: 'template',
+    source: 'pcg',
     variant: 'matching',
     factId: `count-${count}`,
     prompt: '数一数，果篮里有几个苹果？',

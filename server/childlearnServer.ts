@@ -13,6 +13,7 @@ type JsonRecord = Record<string, unknown>;
 export type AiAction =
   | 'observe'
   | 'question'
+  | 'story-polish'
   | 'programming-hint'
   | 'parent-summary';
 
@@ -40,6 +41,7 @@ interface AiConfig {
   parentModel: string;
   programmingHintModel: string;
   questionModel: string;
+  storyPolishModel: string;
 }
 
 interface QuestionRequestBody {
@@ -91,6 +93,14 @@ interface ParentSummaryRequestBody {
   learnerRadar?: Array<{ label?: string; theta?: number }>;
   recommendedMinutes?: string;
   reviewQueueSize?: number;
+}
+
+interface StoryPolishRequestBody {
+  answer?: number;
+  currentPrompt?: string;
+  expression?: string;
+  first?: number;
+  second?: number;
 }
 
 const ACTION_CACHE = new Map<string, CacheEntry>();
@@ -163,7 +173,7 @@ function getCached(action: AiAction, body: unknown) {
 
 function setCached(action: AiAction, body: unknown, responseBody: unknown) {
   const ttlMs =
-    action === 'question'
+    action === 'question' || action === 'story-polish'
       ? 10 * 60_000
       : action === 'observe'
         ? 20_000
@@ -217,6 +227,10 @@ function resolveAiConfig(context: ServerExecutionContext): AiConfig | null {
       readEnv(context, 'CHILDLEARN_AI_HINT_MODEL') ?? defaultModel,
     provider,
     questionModel: readEnv(context, 'CHILDLEARN_AI_QUESTION_MODEL') ?? defaultModel,
+    storyPolishModel:
+      readEnv(context, 'CHILDLEARN_AI_STORY_POLISH_MODEL') ??
+      readEnv(context, 'CHILDLEARN_AI_QUESTION_MODEL') ??
+      defaultModel,
   };
 }
 
@@ -229,6 +243,9 @@ function modelForAction(config: AiConfig, action: AiAction) {
   }
   if (action === 'programming-hint') {
     return config.programmingHintModel;
+  }
+  if (action === 'story-polish') {
+    return config.storyPolishModel;
   }
   return config.questionModel;
 }
@@ -415,6 +432,17 @@ Constraints:
 - objects should have a length that matches the visible quantity and stay at or below 20
 - theme.colorHint can be a simple token hint like rose, orange, amber, lime, violet, pink`;
 
+const STORY_POLISH_SYSTEM_PROMPT = `You rewrite one preschool-friendly Chinese math story prompt for ages 4-6.
+
+Rules:
+- Return exactly one JSON object: { "prompt": string }.
+- Keep exactly the two given operand numbers, in the same order.
+- Do not mention or reveal the answer.
+- Do not use equations, option text, or extra numbers.
+- Use one warm, concrete, child-safe sentence.
+- Keep it short, natural, and easy to read aloud.
+- Avoid danger, fear, violence, medicine, politics, religion, and other sensitive topics.`;
+
 const PROGRAMMING_HINT_SYSTEM_PROMPT = `You are a warm co-pilot for a preschool programming puzzle.
 
 Rules:
@@ -434,6 +462,20 @@ Rules:
 
 Return JSON:
 { "summary": string }`;
+
+const STORY_POLISH_BLOCKLIST = [
+  '打针',
+  '怪兽',
+  '巫婆',
+  '鬼',
+  '血',
+  '打架',
+  '炸弹',
+  '枪',
+  '死亡',
+  '宗教',
+  '选举',
+];
 
 function serializeQuestionOptions(
   rawOptions: unknown,
@@ -491,6 +533,54 @@ function parseVariant(value: unknown): QuestionVariant | null {
     value === 'numberLine'
     ? value
     : null;
+}
+
+function extractIntegerTokens(text: string) {
+  return (text.match(/\d+/g) ?? []).map((value) => Number(value));
+}
+
+function hasBlockedStoryWord(text: string) {
+  return STORY_POLISH_BLOCKLIST.some((word) => text.includes(word));
+}
+
+function validateStoryPolishPrompt(
+  payload: unknown,
+  body: StoryPolishRequestBody,
+): string | null {
+  const first = finiteNumber(body.first);
+  const second = finiteNumber(body.second);
+  const answer = finiteNumber(body.answer);
+  if (first === null || second === null || answer === null) {
+    return null;
+  }
+
+  if (Math.round(first + second) !== Math.round(answer)) {
+    return null;
+  }
+
+  if (!isRecord(payload) || typeof payload.prompt !== 'string') {
+    return null;
+  }
+
+  const prompt = compactText(payload.prompt).slice(0, 40);
+  if (!prompt || prompt.length > 34) {
+    return null;
+  }
+
+  if (/[=+-]/.test(prompt) || hasBlockedStoryWord(prompt)) {
+    return null;
+  }
+
+  const numbers = extractIntegerTokens(prompt);
+  if (
+    numbers.length !== 2 ||
+    numbers[0] !== Math.round(first) ||
+    numbers[1] !== Math.round(second)
+  ) {
+    return null;
+  }
+
+  return prompt;
 }
 
 function normalizeQuestionPayload(
@@ -672,6 +762,37 @@ async function handleQuestionAction(
   };
 }
 
+async function handleStoryPolishAction(
+  body: StoryPolishRequestBody,
+  context: ServerExecutionContext,
+): Promise<ServerResult> {
+  const cached = getCached('story-polish', body);
+  if (cached) {
+    return { status: 200, body: cached };
+  }
+
+  const payload = await requestStructuredJson(
+    context,
+    'story-polish',
+    STORY_POLISH_SYSTEM_PROMPT,
+    body,
+  );
+  const prompt = validateStoryPolishPrompt(payload, body);
+  if (!prompt) {
+    return {
+      status: 502,
+      body: { error: 'invalid_story_polish_payload' },
+    };
+  }
+
+  const responseBody = { prompt };
+  setCached('story-polish', body, responseBody);
+  return {
+    status: 200,
+    body: responseBody,
+  };
+}
+
 async function handleProgrammingHintAction(
   body: ProgrammingHintRequestBody,
   context: ServerExecutionContext,
@@ -776,6 +897,13 @@ export async function executeAiAction(
       return await handleQuestionAction((body ?? {}) as QuestionRequestBody, context);
     }
 
+    if (action === 'story-polish') {
+      return await handleStoryPolishAction(
+        (body ?? {}) as StoryPolishRequestBody,
+        context,
+      );
+    }
+
     if (action === 'programming-hint') {
       return await handleProgrammingHintAction(
         (body ?? {}) as ProgrammingHintRequestBody,
@@ -803,6 +931,8 @@ export async function executeAiAction(
             ? { observation: null, reason: 'ai_unconfigured' }
             : action === 'question'
               ? { question: null, reason: 'ai_unconfigured' }
+              : action === 'story-polish'
+                ? { prompt: null, reason: 'ai_unconfigured' }
               : action === 'programming-hint'
                 ? { hint: null, reason: 'ai_unconfigured' }
                 : { summary: null, reason: 'ai_unconfigured' },
@@ -824,9 +954,12 @@ function forwardHeaders(
   baseHeaders?: HeadersInit,
 ): Record<string, string> {
   const apiKey = readEnv(context, 'CHILDLEARN_SYNC_API_KEY', 'LEARNING_SYNC_API_KEY');
-  const headers: Record<string, string> = {
-    ...(baseHeaders ? Object.fromEntries(new Headers(baseHeaders).entries()) : {}),
-  };
+  const headers: Record<string, string> = {};
+  if (baseHeaders) {
+    new Headers(baseHeaders).forEach((value, key) => {
+      headers[key] = value;
+    });
+  }
   if (apiKey) {
     headers.Authorization = `Bearer ${apiKey}`;
   }
@@ -870,16 +1003,15 @@ export async function proxyLearningSync(
   });
 
   const text = await response.text();
-  let parsed: unknown = null;
-  if (text) {
-    try {
-      parsed = JSON.parse(text) as unknown;
-    } catch {
-      parsed = { ok: response.ok, raw: text };
-    }
-  } else {
-    parsed = { ok: response.ok };
-  }
+  const parsed: unknown = text
+    ? (() => {
+        try {
+          return JSON.parse(text) as unknown;
+        } catch {
+          return { ok: response.ok, raw: text };
+        }
+      })()
+    : { ok: response.ok };
 
   return {
     status: response.status,
@@ -936,4 +1068,5 @@ export const DEFAULT_AI_ACTIONS = {
   parentSummary: PARENT_SUMMARY_ACTION,
   programmingHint: PROGRAMMING_HINT_ACTION,
   question: QUESTION_ACTION,
+  storyPolish: '/api/ai?action=story-polish',
 };

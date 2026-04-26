@@ -23,12 +23,16 @@ function record(index: number, finalCorrect = true): QuestionAttemptRecord {
     questionId: `q-${index}`,
     questionIndex: index,
     tags: TAGS,
+    stem: `${index + 1} + 2 = ?`,
+    choices: ['1', '2', '3', '4'],
     correctAnswer: 3,
+    childAnswer: finalCorrect ? '3' : '2',
     firstSelectedAnswer: finalCorrect ? 3 : 2,
     finalSelectedAnswer: finalCorrect ? 3 : 2,
     firstAttemptCorrect: finalCorrect,
     finalCorrect,
     attemptCount: finalCorrect ? 1 : 2,
+    reactionTimeMs: 2500,
     firstResponseTimeMs: 2500,
     totalTimeMs: finalCorrect ? 3000 : 7000,
     audioReplayCount: 0,
@@ -164,6 +168,9 @@ describe('approveFlowPolicy', () => {
     });
 
     expect(policy.finalState).toBe('easy');
-    expect(policy.rationale).not.toContain('Observer:');
+    expect(policy.rationale).toContain('Observer:');
+    expect(
+      policy.mix.confidence + policy.mix.review + policy.mix.current + policy.mix.challenge,
+    ).toBe(policy.batchSize);
   });
 });

@@ -9,7 +9,7 @@ import {
 function attempt(
   partial: Partial<QuestionAttemptRecord> = {},
 ): QuestionAttemptRecord {
-  return {
+  const base: QuestionAttemptRecord = {
     questionId: 'q1',
     questionIndex: 0,
     tags: {
@@ -22,12 +22,16 @@ function attempt(
       optionDistance: 'close',
       difficultyLevel: 2,
     },
+    stem: '4 + 3 = ?',
+    choices: ['5', '6', '7', '8'],
     correctAnswer: 7,
+    childAnswer: '7',
     firstSelectedAnswer: 7,
     finalSelectedAnswer: 7,
     firstAttemptCorrect: true,
     finalCorrect: true,
     attemptCount: 1,
+    reactionTimeMs: 2200,
     firstResponseTimeMs: 2200,
     totalTimeMs: 2600,
     audioReplayCount: 0,
@@ -37,8 +41,9 @@ function attempt(
     feedbackInterruptClickCount: 0,
     abandoned: false,
     result: 'correct',
-    ...partial,
   };
+
+  return { ...base, ...partial };
 }
 
 describe('abilityProfile', () => {

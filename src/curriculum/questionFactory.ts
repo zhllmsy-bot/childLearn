@@ -1,3 +1,7 @@
+import type { LearnerSkillKey } from '../ai/learnerModel';
+import { goldenSetItemToQuestion, selectGoldenSetItem } from './goldenSet';
+import { parentItemToQuestion, selectParentItem } from './parentItems';
+import type { ParentItem } from './parentItems/types';
 import type {
   Question,
   QuestionLevel,
@@ -17,8 +21,22 @@ import {
 
 export interface GenerateQuestionInput {
   difficulty: number;
+  goldenMode?: 'off' | 'eligible' | 'required';
+  goldenTags?: string[];
+  parentItemMode?: 'off' | 'eligible';
+  parentItems?: ParentItem[];
   serial: number;
+  targetSkillKey?: LearnerSkillKey;
   variant?: QuestionVariant;
+  rng?: () => number;
+  childId?: string;
+}
+
+interface CandidateOptionInput {
+  answer: number;
+  candidates: number[];
+  maxValue: number;
+  minValue?: number;
   rng?: () => number;
 }
 
@@ -28,6 +46,29 @@ function randomInt(min: number, max: number, rng: () => number) {
 
 function shuffle<T>(items: T[], rng: () => number) {
   return [...items].sort(() => rng() - 0.5);
+}
+
+function ensureOptionValues(
+  values: Set<number>,
+  minValue: number,
+  maxValue: number,
+  rng: () => number,
+) {
+  const fallbackPool = shuffle(
+    Array.from({ length: Math.max(maxValue - minValue + 1, 0) }, (_, index) => minValue + index),
+    rng,
+  );
+  fallbackPool.forEach((value) => {
+    if (values.size < 4) {
+      values.add(value);
+    }
+  });
+
+  let spill = maxValue + 1;
+  while (values.size < 4) {
+    values.add(spill);
+    spill += 1;
+  }
 }
 
 function variantCycleForDifficulty(difficulty: number) {
@@ -103,32 +144,193 @@ export function buildOptions(
     }
   });
 
-  while (candidates.size < 4) {
-    candidates.add(randomInt(0, maxValue, rng));
-  }
+  ensureOptionValues(candidates, 0, maxValue, rng);
 
-  return shuffle([...candidates], rng).map((value) => ({
+  return shuffle(Array.from(candidates), rng).map((value) => ({
     id: `option-${value}`,
     label: String(value),
     value,
   }));
 }
 
+function buildCandidateOptions({
+  answer,
+  candidates,
+  maxValue,
+  minValue = 0,
+  rng = Math.random,
+}: CandidateOptionInput): QuestionOption[] {
+  const values = new Set<number>([answer]);
+
+  candidates.forEach((value) => {
+    const rounded = Math.round(value);
+    if (rounded >= minValue && rounded <= maxValue) {
+      values.add(rounded);
+    }
+  });
+
+  ensureOptionValues(values, minValue, maxValue, rng);
+
+  return shuffle(Array.from(values).slice(0, 4), rng).map((value) => ({
+    id: `option-${value}`,
+    label: String(value),
+    value,
+  }));
+}
+
+function buildVariantOptions(
+  variant: QuestionVariant,
+  params: {
+    answer: number;
+    end?: number;
+    first?: number;
+    left?: number;
+    maxValue: number;
+    missing?: number;
+    right?: number;
+    start?: number;
+    total?: number;
+  },
+  rng: () => number,
+): QuestionOption[] {
+  const { answer, maxValue } = params;
+
+  if (variant === 'compare') {
+    const left = params.left ?? answer;
+    const right = params.right ?? answer;
+    const smaller = Math.min(left, right);
+    const larger = Math.max(left, right);
+    const gap = Math.max(larger - smaller, 1);
+    return buildCandidateOptions({
+      answer,
+      candidates: [smaller, larger - 1, gap, larger + 1],
+      maxValue,
+      minValue: 0,
+      rng,
+    });
+  }
+
+  if (variant === 'makeTen') {
+    const start = params.start ?? 0;
+    return buildCandidateOptions({
+      answer,
+      candidates: [start, answer - 1, answer + 1, 10],
+      maxValue: Math.max(maxValue, 10),
+      minValue: 0,
+      rng,
+    });
+  }
+
+  if (variant === 'missing') {
+    const first = params.first ?? 0;
+    const total = params.total ?? answer;
+    return buildCandidateOptions({
+      answer,
+      candidates: [first, answer - 1, total, answer + 1],
+      maxValue: Math.max(maxValue, total),
+      minValue: 0,
+      rng,
+    });
+  }
+
+  if (variant === 'story') {
+    const first = params.first ?? 0;
+    const second = params.missing ?? 0;
+    const difference = Math.abs(first - second);
+    return buildCandidateOptions({
+      answer,
+      candidates: [first, second, answer - 1, difference, answer + 1],
+      maxValue,
+      minValue: 0,
+      rng,
+    });
+  }
+
+  if (variant === 'numberLine') {
+    const start = params.start ?? 0;
+    const end = params.end ?? answer;
+    return buildCandidateOptions({
+      answer,
+      candidates: [start, answer - 1, answer + 1, end],
+      maxValue: Math.max(maxValue, end),
+      minValue: 0,
+      rng,
+    });
+  }
+
+  return buildCandidateOptions({
+    answer,
+    candidates: [answer - 1, answer + 1, answer - 2, answer + 2],
+    maxValue,
+    minValue: 0,
+    rng,
+  });
+}
+
 export function generateQuestion({
   difficulty,
+  goldenMode = 'off',
+  goldenTags,
+  parentItemMode = 'off',
+  parentItems,
   serial,
+  targetSkillKey,
   variant: preferredVariant,
   rng = Math.random,
+  childId = 'local-child',
 }: GenerateQuestionInput): Question {
   const level = levelForDifficulty(difficulty);
   const variant = selectVariantForDifficulty(difficulty, serial, preferredVariant);
   const quantityRange = quantityRangeForDifficulty(difficulty);
   const totalRange = totalRangeForDifficulty(difficulty);
   const maxFact = quantityRange.max;
+  const optionMaxValue = Math.max(maxFact, totalRange.max, 10);
+
+  if (goldenMode !== 'required' && parentItemMode === 'eligible') {
+    const parentItem = selectParentItem({
+      childId,
+      difficulty,
+      items: parentItems,
+      serial,
+      targetSkillKey,
+      variant,
+    });
+
+    if (parentItem) {
+      return parentItemToQuestion(parentItem, serial);
+    }
+  }
+
+  const shouldTryGolden =
+    goldenMode === 'required' ||
+    (goldenMode === 'eligible' && (variant === 'story' || rng() <= 0.15));
+  if (shouldTryGolden) {
+    const goldenItem = selectGoldenSetItem({
+      difficulty,
+      variant,
+      targetSkillKey,
+      tags: goldenTags,
+    });
+
+    if (goldenItem) {
+      return goldenSetItemToQuestion(goldenItem, serial);
+    }
+  }
 
   if (variant === 'matching') {
     const count = randomInt(quantityRange.min, quantityRange.max, rng);
-    return buildMatchingQuestion(count, level, buildOptions(count, maxFact, rng));
+    return buildMatchingQuestion(
+      count,
+      level,
+      buildVariantOptions(
+        'matching',
+        {
+          answer: count,
+          maxValue: optionMaxValue,
+        },
+        rng,
+      ),
+    );
   }
 
   if (variant === 'compare') {
@@ -140,13 +342,34 @@ export function generateQuestion({
       left,
       right,
       level,
-      buildOptions(answer, maxFact, rng),
+      buildVariantOptions(
+        'compare',
+        {
+          answer,
+          left,
+          maxValue: optionMaxValue,
+          right,
+        },
+        rng,
+      ),
     );
   }
 
   if (variant === 'makeTen') {
     const start = randomInt(1, 9, rng);
-    return buildMakeTenQuestion(start, level, buildOptions(10 - start, 10, rng));
+    return buildMakeTenQuestion(
+      start,
+      level,
+      buildVariantOptions(
+        'makeTen',
+        {
+          answer: 10 - start,
+          maxValue: 10,
+          start,
+        },
+        rng,
+      ),
+    );
   }
 
   if (variant === 'missing') {
@@ -156,7 +379,16 @@ export function generateQuestion({
       first,
       missing,
       level,
-      buildOptions(missing, maxFact, rng),
+      buildVariantOptions(
+        'missing',
+        {
+          answer: missing,
+          first,
+          maxValue: Math.max(optionMaxValue, total),
+          total,
+        },
+        rng,
+      ),
     );
   }
 
@@ -167,7 +399,17 @@ export function generateQuestion({
       first,
       second,
       level,
-      buildOptions(first + second, maxFact, rng),
+      buildVariantOptions(
+        'story',
+        {
+          answer: first + second,
+          first,
+          maxValue: Math.max(optionMaxValue, total),
+          missing: second,
+        },
+        rng,
+      ),
+      rng,
     );
   }
 
@@ -179,6 +421,15 @@ export function generateQuestion({
     start,
     end,
     level,
-    buildOptions(jump, maxFact, rng),
+    buildVariantOptions(
+      'numberLine',
+      {
+        answer: jump,
+        end,
+        maxValue: Math.max(optionMaxValue, end),
+        start,
+      },
+      rng,
+    ),
   );
 }
