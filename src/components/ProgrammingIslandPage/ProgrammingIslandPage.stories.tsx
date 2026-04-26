@@ -1,10 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useEffect, type ReactNode } from 'react';
 import { PROGRAMMING_PAGE_THEME_VARS, PROGRAMMING_FONT_STACK } from '../../theme/tokens';
+import {
+  AppTopBar,
+  AppTopBarProvider,
+  useTopBarConfig,
+  type AppTopBarConfig,
+} from '../AppTopBar/AppTopBar';
 import { ProgrammingIslandPage } from './ProgrammingIslandPage';
 import { ProgrammingDrawerBlock } from './ProgrammingDrawerBlock';
 import { ProgrammingProgramBlock } from './ProgrammingProgramBlock';
-import { ProgrammingTopBar } from './ProgrammingTopBar';
 
 const baseArgs = {
   completedLevelIds: [],
@@ -40,16 +45,32 @@ function Surface({ children }: { children: ReactNode }) {
   );
 }
 
+function AppChrome({ children }: { children: ReactNode }) {
+  return (
+    <AppTopBarProvider>
+      <AppTopBar />
+      {children}
+    </AppTopBarProvider>
+  );
+}
+
+function TopBarFixture({ config }: { config: AppTopBarConfig }) {
+  useTopBarConfig(config, 10);
+  return <AppTopBar />;
+}
+
 export const Default: Story = {
   render: () => (
-    <ProgrammingIslandPage
-      completedLevelIds={[]}
-      initialLevelId="sequence-apple"
-      onBack={() => undefined}
-      onCompleteLevel={() => undefined}
-      onSpeak={() => undefined}
-      unlockedLevelCount={1}
-    />
+    <AppChrome>
+      <ProgrammingIslandPage
+        completedLevelIds={[]}
+        initialLevelId="sequence-apple"
+        onBack={() => undefined}
+        onCompleteLevel={() => undefined}
+        onSpeak={() => undefined}
+        unlockedLevelCount={1}
+      />
+    </AppChrome>
   ),
 };
 
@@ -92,19 +113,37 @@ export const Focus: Story = {
     canvasElement.querySelector('button')?.focus();
   },
   render: () => (
-    <Surface>
-      <ProgrammingTopBar
-        isMuted={false}
-        onBack={() => undefined}
-        onPaceChange={() => undefined}
-        onToggleMute={() => undefined}
-        onToggleSettings={() => undefined}
-        pace="slow"
-        progressDots={[true, true, false, false, false, false]}
-        settingsOpen={false}
-        title="第一条小路"
+    <AppTopBarProvider>
+      <TopBarFixture
+        config={{
+          actions: [
+            {
+              ariaLabel: '打开设置',
+              icon: 'settings',
+              id: 'settings',
+              onClick: () => undefined,
+            },
+            {
+              ariaLabel: '关闭声音',
+              icon: 'sound',
+              id: 'sound',
+              onClick: () => undefined,
+            },
+          ],
+          leadingAction: {
+            ariaLabel: '首页',
+            icon: 'home',
+            id: 'home',
+            onClick: () => undefined,
+          },
+          progressDots: [true, true, false, false, false, false],
+          title: '第一条小路',
+        }}
       />
-    </Surface>
+      <Surface>
+        <div className="programming-card p-6">TopBar 聚焦态</div>
+      </Surface>
+    </AppTopBarProvider>
   ),
 };
 
@@ -144,6 +183,7 @@ export const ReducedMotion: Story = {
     }, []);
 
     return (
+      <AppChrome>
       <ProgrammingIslandPage
         completedLevelIds={[]}
         initialLevelId="sequence-apple"
@@ -152,6 +192,7 @@ export const ReducedMotion: Story = {
         onSpeak={() => undefined}
         unlockedLevelCount={1}
       />
+      </AppChrome>
     );
   },
 };
@@ -159,18 +200,37 @@ export const ReducedMotion: Story = {
 export const Dark: Story = {
   parameters: { backgrounds: { default: 'dark' } },
   render: () => (
-    <Surface>
-      <ProgrammingTopBar
-        isMuted
-        onBack={() => undefined}
-        onPaceChange={() => undefined}
-        onToggleMute={() => undefined}
-        onToggleSettings={() => undefined}
-        pace="fast"
-        progressDots={[true, true, true, false, false, false]}
-        settingsOpen={false}
-        title="拐个小弯"
+    <AppTopBarProvider>
+      <TopBarFixture
+        config={{
+          actions: [
+            {
+              ariaLabel: '打开设置',
+              icon: 'settings',
+              id: 'settings',
+              onClick: () => undefined,
+            },
+            {
+              ariaLabel: '打开声音',
+              icon: 'mute',
+              id: 'sound',
+              onClick: () => undefined,
+              pressed: true,
+            },
+          ],
+          leadingAction: {
+            ariaLabel: '首页',
+            icon: 'home',
+            id: 'home',
+            onClick: () => undefined,
+          },
+          progressDots: [true, true, true, false, false, false],
+          title: '拐个小弯',
+        }}
       />
-    </Surface>
+      <Surface>
+        <div className="programming-card p-6">夜色背景预览</div>
+      </Surface>
+    </AppTopBarProvider>
   ),
 };

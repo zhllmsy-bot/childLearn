@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createEmptyLearnerProfile } from '../../ai/learnerModel';
 import { selectFlowQuestionPlan } from './questionSelector';
 import type { ApprovedFlowPolicy } from './types';
 
@@ -128,5 +129,33 @@ describe('selectFlowQuestionPlan', () => {
     expect(variants).not.toContain('matching');
     expect(variants).not.toContain('makeTen');
     expect(variants).not.toContain('compare');
+  });
+
+  it('targets the learner recommended skill within one difficulty step', () => {
+    const learnerProfile = {
+      ...createEmptyLearnerProfile(),
+      recommendedSkill: 'makeTen' as const,
+      skills: {
+        ...createEmptyLearnerProfile().skills,
+        makeTen: {
+          ...createEmptyLearnerProfile().skills.makeTen,
+          theta: -0.8,
+          confidence: 0.7,
+          attempts: 5,
+        },
+      },
+    };
+    const plan = selectFlowQuestionPlan({
+      learnerProfile,
+      policy: BASE_POLICY,
+      fallbackDifficulty: 4,
+      serial: 8,
+    });
+
+    expect(plan.lane).toBe('challenge');
+    expect(plan.targetSkillKey).toBe('makeTen');
+    expect(plan.variant).toBe('makeTen');
+    expect(plan.difficulty).toBeGreaterThanOrEqual(4);
+    expect(plan.difficulty).toBeLessThanOrEqual(6);
   });
 });

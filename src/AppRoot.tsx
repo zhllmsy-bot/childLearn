@@ -12,12 +12,19 @@ import {
   FeedbackBadge,
   type FeedbackLevel,
 } from './components/FeedbackBadge/FeedbackBadge';
+import { FlowStatusIndicator } from './components/FlowStatusIndicator/FlowStatusIndicator';
 import { HomeDashboard } from './components/HomeDashboard/HomeDashboard';
 import { LevelResult } from './components/LevelResult/LevelResult';
 import { ParentReportPanel } from './components/ParentReportPanel/ParentReportPanel';
 import { PracticeSession } from './components/PracticeSession/PracticeSession';
 import { StickerActionModal } from './components/StickerActionModal/StickerActionModal';
-import { TopBar } from './components/TopBar/TopBar';
+import {
+  AppTopBar,
+  AppTopBarProvider,
+  useTopBarConfig,
+  type AppTopBarConfig,
+} from './components/AppTopBar/AppTopBar';
+import { useLearnerProfile } from './ai/useLearnerProfile';
 import { generateQuestion } from './curriculum/questionFactory';
 import {
   DIAGNOSTIC_QUESTION_COUNT,
@@ -88,7 +95,6 @@ import {
   findLiteracyItemById,
   type LiteracyItem,
 } from './literacy/literacyItems';
-import { LongPressGate } from './immersion/LongPressGate';
 import { SkeletonScreen } from './immersion/SkeletonScreen';
 import { ToastStack, type ToastMessage } from './immersion/Toast';
 import { useNoInterrupt } from './immersion/useNoInterrupt';
@@ -155,6 +161,14 @@ import { useProgrammingRewards } from './app/useProgrammingRewards';
 import { useSceneNavigation } from './app/useSceneNavigation';
 
 export default function AppRoot() {
+  return (
+    <AppTopBarProvider>
+      <AppRootContent />
+    </AppTopBarProvider>
+  );
+}
+
+function AppRootContent() {
   useLearningStateSync();
 
   const initialAppSnapshotRef = useRef<StoredAppSnapshot | null>(
@@ -289,6 +303,8 @@ export default function AppRoot() {
   const rewardGarden = useRewardGarden();
   const numberSpirits = useNumberSpirits();
   const ability = useAbilityProfile();
+  const learner = useLearnerProfile();
+  const learnerProfileRef = useRef(learner.profile);
   const programmingProgress = useProgrammingProgress();
   const skins = useSkinUnlock(rank.stars, combo.maxEver, stats.correct);
   const currentSkin = skins[0];
@@ -317,6 +333,10 @@ export default function AppRoot() {
   useEffect(() => {
     reviewQueueRef.current = reviewQueue;
   }, [reviewQueue]);
+
+  useEffect(() => {
+    learnerProfileRef.current = learner.profile;
+  }, [learner.profile]);
 
   useEffect(() => {
     if (scene !== 'home') {
@@ -603,6 +623,9 @@ export default function AppRoot() {
           recentStates: previousFlowStates,
           observation,
         });
+        if (observation.profileRefinement) {
+          learner.applyRefinement(observation.profileRefinement);
+        }
 
         recentFlowStatesRef.current = [
           ...previousFlowStates,
@@ -626,6 +649,7 @@ export default function AppRoot() {
           issue: observation.primaryIssue,
           direction: observation.recommendation.direction,
           adjustmentDimension: observation.recommendation.adjustmentDimension,
+          profileRefinementApplied: Boolean(observation.profileRefinement),
         });
         track('flow.policy_approved', {
           runId,
@@ -646,7 +670,7 @@ export default function AppRoot() {
 
       return policy;
     },
-    [dda],
+    [dda, learner.applyRefinement],
   );
 
   const maybeCreateInterimFlowPolicy = useCallback(
@@ -743,6 +767,7 @@ export default function AppRoot() {
     }
 
     const plan = selectFlowQuestionPlan({
+      learnerProfile: learnerProfileRef.current,
       policy: currentRunPolicyRef.current,
       fallbackDifficulty: difficulty,
       serial,
@@ -1418,6 +1443,7 @@ export default function AppRoot() {
         levelAttemptRecordsRef.current = nextAttemptRecords;
         if (!isDiagnosticRun) {
           ability.recordAttempt(completedAttemptRecord);
+          learner.recordAttempt(completedAttemptRecord);
           recordLearningHistory(completedAttemptRecord);
         }
         const flowId = beginFlow();
@@ -1624,6 +1650,7 @@ export default function AppRoot() {
         levelAttemptRecordsRef.current = nextAttemptRecords;
         if (!isDiagnosticRun) {
           ability.recordAttempt(completedAttemptRecord);
+          learner.recordAttempt(completedAttemptRecord);
           recordLearningHistory(completedAttemptRecord);
         }
         const nextLevelProgress = levelProgress + 1;
@@ -1745,6 +1772,7 @@ export default function AppRoot() {
       levelNewSpirits,
       levelProgress,
       levelQuestionGoal,
+      learner.recordAttempt,
       maybeCreateInterimFlowPolicy,
       nextQuestion,
       numberSpirits,
@@ -1779,6 +1807,82 @@ export default function AppRoot() {
       })),
     [answered, hintStage, question, selectedOptionId],
   );
+
+  const topBarConfig = useMemo<AppTopBarConfig>(() => {
+    const title =
+      scene === 'literacy'
+        ? '识字乐园'
+        : scene === 'english'
+          ? '英语乐园'
+          : scene === 'stickers'
+            ? '贴纸图鉴'
+            : scene === 'result'
+              ? '本关完成'
+              : scene === 'programming'
+                ? '编程岛'
+                : scene === 'practice'
+                  ? '本关练习'
+                  : `${currentSkin.name}摘果`;
+    const actions: AppTopBarConfig['actions'] = [
+      {
+        ariaLabel: '播放语音',
+        icon: 'sound',
+        id: 'sound',
+        onClick: handleSound,
+      },
+    ];
+
+    if (scene !== 'stickers') {
+      actions.push({
+        ariaLabel: '打开贴纸图鉴',
+        icon: 'stickers',
+        id: 'stickers',
+        onClick: handleOpenStickerAlbum,
+      });
+    }
+
+    if (scene !== 'programming') {
+      actions.push({
+        ariaLabel: '长按打开家长报告',
+        holdMs: 3000,
+        icon: 'parent-report',
+        id: 'parent-report',
+        onHold: () => setParentReportOpen(true),
+      });
+    }
+
+    return {
+      actions,
+      leadingAction: {
+        ariaLabel: '首页',
+        icon: 'home',
+        id: 'home',
+        onClick: handleHome,
+      },
+      status:
+        scene === 'practice' ? (
+          <FlowStatusIndicator
+            flowState={flowShadowPolicy?.finalState ?? flowShadowReport?.rulePreState ?? null}
+            learnerFlowState={learner.profile.flowState}
+            observerStatus={flowObserverStatus}
+          />
+        ) : null,
+      title,
+    };
+  }, [
+    currentSkin.name,
+    flowObserverStatus,
+    flowShadowPolicy?.finalState,
+    flowShadowReport?.rulePreState,
+    handleHome,
+    handleOpenStickerAlbum,
+    handleSound,
+    learner.profile.flowState,
+    scene,
+  ]);
+
+  useTopBarConfig(topBarConfig);
+
   return (
     <main
       ref={mainRef}
@@ -1787,22 +1891,15 @@ export default function AppRoot() {
       }`}
       style={gradientStyle(currentSkin.gradient || BG.mint)}
     >
-      {scene !== 'programming' ? (
-        <TopBar
-          themeName={
-            scene === 'literacy'
-              ? '识字乐园'
-              : scene === 'english'
-                ? '英语乐园'
-                : `${currentSkin.name}摘果`
-          }
-          onHome={handleHome}
-          onSound={handleSound}
-        />
-      ) : null}
+      <AppTopBar />
       {scene === 'practice' ? <FeedbackBadge level={feedback} /> : null}
       {scene === 'practice' ? <ComboBanner combo={combo.current} /> : null}
 
+      <div
+        className={`app-content ${
+          scene === 'programming' ? 'app-content-programming' : ''
+        }`}
+      >
       <Suspense fallback={<SkeletonScreen />}>
       <AnimatePresence mode="wait">
         {scene === 'home' ? (
@@ -1840,7 +1937,6 @@ export default function AppRoot() {
             key="literacy"
             items={LITERACY_ITEMS}
             selectedItem={selectedLiteracyItem}
-            onBack={handleHome}
             onSelectItem={handleSelectLiteracyItem}
             onSpeakItem={handleSpeakLiteracyItem}
           />
@@ -1849,7 +1945,6 @@ export default function AppRoot() {
             key="english"
             items={ENGLISH_ITEMS}
             selectedItem={selectedEnglishItem}
-            onBack={handleHome}
             onSelectItem={handleSelectEnglishItem}
             onSpeakItem={handleSpeakEnglishItem}
           />
@@ -1869,7 +1964,6 @@ export default function AppRoot() {
             stickers={stickers.collected}
             stickerTotal={stickers.total}
             seriesProgress={stickers.seriesProgress}
-            onBack={handleHome}
             onInspectSticker={handleInspectSticker}
           />
         ) : scene === 'result' && lastResult ? (
@@ -1885,7 +1979,6 @@ export default function AppRoot() {
             sticker={lastResult.sticker}
             gardenReward={lastResult.gardenReward}
             newSpirits={lastResult.newSpirits}
-            onHome={handleHome}
             onRetry={resetLevelRun}
             onContinue={resetLevelRun}
             onInspectSticker={handleInspectSticker}
@@ -1909,10 +2002,7 @@ export default function AppRoot() {
         )}
       </AnimatePresence>
       </Suspense>
-
-      {scene !== 'programming' ? (
-        <LongPressGate onOpen={() => setParentReportOpen(true)} />
-      ) : null}
+      </div>
 
       <AnimatePresence>
         {selectedSticker ? (
@@ -1945,6 +2035,7 @@ export default function AppRoot() {
         flowObserverStatus={flowObserverStatus}
         flowObserverReason={flowObservation?.stateReason ?? null}
         flowObserverIssue={flowObservation?.primaryIssue ?? null}
+        learnerProfile={learner.profile}
       />
       <ToastStack messages={toasts} />
     </main>

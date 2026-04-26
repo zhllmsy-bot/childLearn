@@ -1,3 +1,5 @@
+import type { ProfileRefinement } from '../../ai/learnerModel';
+
 export type FlowState = 'easy' | 'flow' | 'stretch' | 'hard' | 'fatigue';
 
 export type NumberRange = 'within_5' | 'within_10' | 'within_20' | 'within_30';
@@ -166,6 +168,7 @@ export interface LlmLearningObservation {
     avoid: string[];
   };
   uxSuggestions: string[];
+  profileRefinement?: ProfileRefinement;
 }
 
 export interface ApprovedFlowPolicy {

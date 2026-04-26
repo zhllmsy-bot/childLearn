@@ -4,7 +4,6 @@ import { LearningCardModulePage } from '../LearningCardModule/LearningCardModule
 interface EnglishModulePageProps {
   items: EnglishItem[];
   selectedItem: EnglishItem;
-  onBack: () => void;
   onSelectItem: (item: EnglishItem) => void;
   onSpeakItem: (item: EnglishItem) => void;
 }
@@ -12,7 +11,6 @@ interface EnglishModulePageProps {
 export function EnglishModulePage({
   items,
   selectedItem,
-  onBack,
   onSelectItem,
   onSpeakItem,
 }: EnglishModulePageProps) {
@@ -31,9 +29,7 @@ export function EnglishModulePage({
         gridEyebrow: '字母卡',
         gridTitle: '全部字母',
         speakLabel: '读一读',
-        backLabel: '回首页',
       }}
-      onBack={onBack}
       onSelectCard={onSelectItem}
       onSpeakCard={onSpeakItem}
     />

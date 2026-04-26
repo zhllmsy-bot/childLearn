@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, Lock, Sparkles, Star, Zap } from 'lucide-react';
+import { BookOpen, Lock, Sparkles, Star, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import {
@@ -13,7 +13,6 @@ interface StickerAlbumPageProps {
   stickers: Sticker[];
   stickerTotal: number;
   seriesProgress: StickerSeriesProgress[];
-  onBack: () => void;
   onInspectSticker: (sticker: Sticker) => void;
 }
 
@@ -47,7 +46,6 @@ export function StickerAlbumPage({
   stickers,
   stickerTotal,
   seriesProgress,
-  onBack,
   onInspectSticker,
 }: StickerAlbumPageProps) {
   const recentStickers = [...stickers].reverse();
@@ -68,14 +66,9 @@ export function StickerAlbumPage({
         <div className="sticker-album-summary-grid relative grid gap-5">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={onBack}
-                className="inline-flex h-14 items-center gap-2 rounded-2xl bg-emerald-50 px-4 text-base font-black text-emerald-800 shadow-sm ring-1 ring-emerald-100"
-              >
-                <ArrowLeft size={22} strokeWidth={3.2} />
-                返回
-              </button>
+              <div className="text-sm font-black text-emerald-700/85">
+                伙伴收藏册
+              </div>
               <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-4 py-2 text-base font-black text-emerald-900 ring-1 ring-sky-200">
                 <BookOpen size={18} strokeWidth={3} />
                 {stickers.length}/{stickerTotal}
@@ -85,7 +78,7 @@ export function StickerAlbumPage({
             <div className="mt-5">
               <div className="flex items-center gap-2 text-sm font-black text-emerald-700/85">
                 <Sparkles size={18} strokeWidth={3} />
-                伙伴收藏册
+                小满的奖励屋
               </div>
               <h1 className="mt-2 text-5xl font-black leading-none text-emerald-950 md:text-6xl">
                 贴纸图鉴

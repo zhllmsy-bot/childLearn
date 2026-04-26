@@ -1,4 +1,4 @@
-import { Volume2 } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 
 interface ProgrammingTaskBubbleProps {
   left: number;
@@ -30,7 +30,7 @@ export function ProgrammingTaskBubble({
           onClick={onSpeak}
           className="programming-icon-button absolute bottom-4 right-4 flex h-10 w-10 items-center justify-center rounded-[20px] text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
         >
-          <Volume2 size={20} strokeWidth={2.6} />
+          <MessageCircle size={20} strokeWidth={2.6} />
         </button>
         <div className="programming-task-tail absolute bottom-[-8px] left-8 h-4 w-4 rotate-45" />
       </div>

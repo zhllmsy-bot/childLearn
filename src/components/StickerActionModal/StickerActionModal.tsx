@@ -1,4 +1,4 @@
-import { Volume2, X, Zap } from 'lucide-react';
+import { MessageCircle, X, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Sticker } from '../../engagement/collection/useStickers';
 import { SPRING } from '../../theme/springs';
@@ -104,7 +104,7 @@ export function StickerActionModal({
               onClick={onReplayVoice}
               className="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-500 px-5 py-4 text-2xl font-black text-white shadow-xl shadow-cyan-500/25 ring-2 ring-white"
             >
-              <Volume2 size={30} strokeWidth={3.2} />
+              <MessageCircle size={30} strokeWidth={3.2} />
               再听一次
             </button>
           </div>

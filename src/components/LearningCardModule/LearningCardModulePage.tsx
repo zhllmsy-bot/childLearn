@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowLeft, BookOpen, CheckCircle2, Sparkles, Volume2 } from 'lucide-react';
+import { BookOpen, CheckCircle2, MessageCircle, Sparkles } from 'lucide-react';
 import type { LearningCard } from '../../learningCards/types';
 import { SPRING } from '../../theme/springs';
 import { BigButton } from '../_primitives/BigButton';
@@ -15,14 +15,12 @@ interface LearningCardModuleLabels {
   gridEyebrow: string;
   gridTitle: string;
   speakLabel: string;
-  backLabel: string;
 }
 
 interface LearningCardModulePageProps<TCard extends LearningCard> {
   cards: TCard[];
   selectedCard: TCard;
   labels: LearningCardModuleLabels;
-  onBack: () => void;
   onSelectCard: (card: TCard) => void;
   onSpeakCard: (card: TCard) => void;
 }
@@ -82,7 +80,6 @@ export function LearningCardModulePage<TCard extends LearningCard>({
   cards,
   selectedCard,
   labels,
-  onBack,
   onSelectCard,
   onSpeakCard,
 }: LearningCardModulePageProps<TCard>) {
@@ -96,15 +93,7 @@ export function LearningCardModulePage<TCard extends LearningCard>({
     >
       <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/88 p-5 shadow-[0_24px_80px_rgba(15,118,110,0.14)] ring-1 ring-emerald-900/5 backdrop-blur-xl md:p-6">
         <div className="relative flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex h-14 items-center gap-2 rounded-2xl bg-white px-4 text-base font-black text-emerald-900 shadow-sm ring-1 ring-emerald-100"
-          >
-            <ArrowLeft size={22} strokeWidth={3.2} />
-            {labels.backLabel}
-          </button>
-          <div className="min-w-0 flex-1 text-center">
+          <div className="min-w-0">
             <div className="text-sm font-black text-emerald-700/80">
               {labels.moduleEyebrow}
             </div>
@@ -152,7 +141,7 @@ export function LearningCardModulePage<TCard extends LearningCard>({
               onClick={() => onSpeakCard(selectedCard)}
               className="mt-5 flex w-full items-center justify-center gap-3 rounded-[1.5rem] bg-emerald-600 px-6 py-4 text-2xl text-white shadow-lg shadow-emerald-900/15 ring-white"
             >
-              <Volume2 size={30} strokeWidth={3.2} />
+              <MessageCircle size={30} strokeWidth={3.2} />
               {labels.speakLabel}
             </BigButton>
           </div>

@@ -1,13 +1,7 @@
 import confetti from 'canvas-confetti';
+import { CONFETTI_PALETTE } from './tokens';
 
 export type CelebrationLevel = 'correct' | 'great' | 'amazing';
-
-const PALETTE = {
-  gold: ['#FFB200', '#FFD257', '#FFECB0'],
-  candy: ['#F77444', '#FFB200', '#3EA02D', '#2E8CF0'],
-  emerald: ['#3EA02D', '#7FC86A', '#C8EDBC', '#FFB200'],
-  party: ['#FFD9C2', '#FFECB0', '#C8EDBC', '#C2E0FF'],
-} as const;
 
 function shouldReduceMotion() {
   return (
@@ -23,7 +17,7 @@ export function celebrate(level: CelebrationLevel = 'correct') {
 
   const scalar = level === 'amazing' ? 1.08 : level === 'great' ? 1.04 : 1;
   const count = level === 'amazing' ? 16 : level === 'great' ? 12 : 8;
-  const main = level === 'amazing' ? PALETTE.party : PALETTE.candy;
+  const main = level === 'amazing' ? CONFETTI_PALETTE.party : CONFETTI_PALETTE.candy;
 
   confetti({
     particleCount: count,
@@ -46,7 +40,7 @@ export function celebrate(level: CelebrationLevel = 'correct') {
       startVelocity: 18,
       gravity: 0.7,
       origin: { x: 0.5, y: 0.5 },
-      colors: [...PALETTE.gold],
+      colors: [...CONFETTI_PALETTE.gold],
       scalar,
       zIndex: 9999,
     });

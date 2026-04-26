@@ -6,6 +6,7 @@ import type {
   LlmIssueType,
   LlmLearningObservation,
 } from './types';
+import { parseProfileRefinement } from '../../ai/learnerModel';
 
 const FLOW_STATES = new Set(['easy', 'flow', 'stretch', 'hard', 'fatigue']);
 const OBSERVER_STATES = new Set([...FLOW_STATES, 'unstable']);
@@ -156,6 +157,8 @@ export function parseLlmLearningObservation(
       avoid: asStringArray(avoid),
     },
     uxSuggestions: asStringArray(value.uxSuggestions),
+    profileRefinement:
+      parseProfileRefinement(value.profileRefinement) ?? undefined,
   };
 }
 

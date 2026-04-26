@@ -13,6 +13,11 @@ import type { Sticker } from '../../engagement/collection/useStickers';
 import { createLearningHistorySummary } from '../../engagement/report/learningHistory';
 import { zhCN } from '../../i18n/zh-CN';
 import { SPRING } from '../../theme/springs';
+import {
+  LEARNER_RADAR_SKILLS,
+  LEARNER_SKILL_DEFINITIONS,
+  type LearnerProfile,
+} from '../../ai/learnerModel';
 import { StickerArtwork } from '../_primitives/StickerArtwork';
 
 interface ParentReportPanelProps {
@@ -35,6 +40,7 @@ interface ParentReportPanelProps {
   flowObserverStatus?: string | null;
   flowObserverReason?: string | null;
   flowObserverIssue?: string | null;
+  learnerProfile?: LearnerProfile;
 }
 
 const FLOW_STATE_LABELS: Record<string, string> = {
@@ -106,6 +112,123 @@ const FOCUS_SKILL_LABELS: Record<string, string> = {
   'range:within_30': '30以内数量',
 };
 
+function thetaToRadarRatio(theta: number) {
+  return Math.min(Math.max((theta + 2) / 4, 0.12), 1);
+}
+
+function radarPoint(index: number, total: number, ratio: number) {
+  const angle = -Math.PI / 2 + (Math.PI * 2 * index) / total;
+  const radius = 42 * ratio;
+
+  return {
+    x: 50 + Math.cos(angle) * radius,
+    y: 50 + Math.sin(angle) * radius,
+  };
+}
+
+function formatTheta(theta: number) {
+  return theta > 0 ? `+${theta.toFixed(1)}` : theta.toFixed(1);
+}
+
+function LearnerRadar({ profile }: { profile: LearnerProfile }) {
+  const skills = LEARNER_RADAR_SKILLS.map((skillKey) => ({
+    key: skillKey,
+    definition: LEARNER_SKILL_DEFINITIONS[skillKey],
+    state: profile.skills[skillKey],
+  }));
+  const polygon = skills
+    .map((skill, index) => {
+      const point = radarPoint(
+        index,
+        skills.length,
+        thetaToRadarRatio(skill.state.theta),
+      );
+      return `${point.x},${point.y}`;
+    })
+    .join(' ');
+
+  return (
+    <div className="grid gap-4 md:grid-cols-[130px_minmax(0,1fr)]">
+      <svg
+        aria-hidden="true"
+        className="mx-auto h-32 w-32"
+        viewBox="0 0 100 100"
+      >
+        {[0.35, 0.65, 1].map((ratio) => (
+          <polygon
+            key={ratio}
+            fill="none"
+            points={skills
+              .map((_, index) => {
+                const point = radarPoint(index, skills.length, ratio);
+                return `${point.x},${point.y}`;
+              })
+              .join(' ')}
+            stroke="var(--border-soft)"
+            strokeWidth="1.5"
+          />
+        ))}
+        {skills.map((_, index) => {
+          const point = radarPoint(index, skills.length, 1);
+          return (
+            <line
+              key={`axis-${index}`}
+              stroke="var(--border-soft)"
+              strokeWidth="1"
+              x1="50"
+              x2={point.x}
+              y1="50"
+              y2={point.y}
+            />
+          );
+        })}
+        <polygon
+          fill="var(--brand-primary)"
+          fillOpacity="0.18"
+          points={polygon}
+          stroke="var(--brand-deep)"
+          strokeLinejoin="round"
+          strokeWidth="2.5"
+        />
+        {skills.map((skill, index) => {
+          const point = radarPoint(
+            index,
+            skills.length,
+            thetaToRadarRatio(skill.state.theta),
+          );
+          return (
+            <circle
+              cx={point.x}
+              cy={point.y}
+              fill="var(--right-light)"
+              key={skill.key}
+              r="2.6"
+              stroke="var(--brand-deep)"
+              strokeWidth="1"
+            />
+          );
+        })}
+      </svg>
+
+      <div className="grid gap-2">
+        {skills.map((skill) => (
+          <div
+            className="flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-3 py-2 ring-1 ring-emerald-100"
+            key={skill.key}
+          >
+            <span className="text-base font-black text-emerald-950">
+              {skill.definition.label}
+            </span>
+            <span className="shrink-0 text-sm font-black text-emerald-800">
+              θ {formatTheta(skill.state.theta)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function formatDelta(value: number, suffix = '') {
   if (value > 0) {
     return `+${value}${suffix}`;
@@ -153,6 +276,7 @@ export function ParentReportPanel({
   flowObserverStatus,
   flowObserverReason,
   flowObserverIssue,
+  learnerProfile,
 }: ParentReportPanelProps) {
   const accuracy = attempted === 0 ? 100 : Math.round((correct / attempted) * 100);
   const unlockedSkins = skins.filter((skin) => skin.unlocked);
@@ -398,6 +522,34 @@ export function ParentReportPanel({
                       </div>
                     ) : null}
                   </div>
+                </div>
+              </section>
+            ) : null}
+
+            {learnerProfile ? (
+              <section className="space-y-3">
+                <h3 className="text-2xl font-black text-emerald-950">
+                  AI 能力雷达
+                </h3>
+                <div className="rounded-3xl bg-white p-4 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-100">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-emerald-700">
+                        多维 θ 画像
+                      </div>
+                      <div className="text-xl font-black text-emerald-950">
+                        {learnerProfile.flowState === 'bored'
+                          ? '偏易，准备加一点'
+                          : learnerProfile.flowState === 'anxious'
+                            ? '偏难，先托一把'
+                            : '正在心流区'}
+                      </div>
+                    </div>
+                    <div className="rounded-full bg-amber-50 px-3 py-2 text-sm font-black text-amber-900 ring-1 ring-amber-100">
+                      {learnerProfile.recentResponses.length} / 50
+                    </div>
+                  </div>
+                  <LearnerRadar profile={learnerProfile} />
                 </div>
               </section>
             ) : null}

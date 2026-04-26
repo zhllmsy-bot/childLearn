@@ -20,6 +20,7 @@ export const LEARNING_STORAGE_KEYS = [
   'childlearn.programming-progress-v1',
   'childlearn.diagnostic-v1',
   'childlearn.learning-history-v1',
+  'childlearn.learner-model-v1',
 ] as const;
 
 type LearningStorageKey = (typeof LEARNING_STORAGE_KEYS)[number];
@@ -465,6 +466,11 @@ function mergeLearningHistory(localValue: string | undefined, remoteValue: strin
   });
 }
 
+function learnerModelUpdatedAt(value: string | undefined) {
+  const parsed = parseJson(value);
+  return isPlainRecord(parsed) ? finiteNumber(parsed.updatedAt) : 0;
+}
+
 function mergeValue(
   key: LearningStorageKey,
   localValue: string | undefined,
@@ -512,6 +518,10 @@ function mergeValue(
         : localValue;
     case 'childlearn.learning-history-v1':
       return mergeLearningHistory(localValue, remoteValue);
+    case 'childlearn.learner-model-v1':
+      return learnerModelUpdatedAt(remoteValue) >= learnerModelUpdatedAt(localValue)
+        ? remoteValue
+        : localValue;
     case 'childlearn.app-state-v1':
       return appSnapshotUpdatedAt(remoteValue) >= appSnapshotUpdatedAt(localValue)
         ? remoteValue

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { GradientStops } from '../../theme/tokens';
-import { BG } from '../../theme/tokens';
+import { BG, SKIN_GRADIENTS } from '../../theme/tokens';
 
 export interface Skin {
   id: string;
@@ -22,31 +22,31 @@ export function useSkinUnlock(stars: number, maxCombo: number, totalCorrect: num
         id: 'rainbow',
         name: '彩虹',
         unlocked: totalCorrect >= 10,
-        gradient: ['#BAE6FD', '#93C5FD', '#818CF8'],
+        gradient: SKIN_GRADIENTS.rainbow,
       },
       {
         id: 'candy',
         name: '糖果',
         unlocked: maxCombo >= 5,
-        gradient: ['#FBCFE8', '#C4B5FD', '#818CF8'],
+        gradient: SKIN_GRADIENTS.candy,
       },
       {
         id: 'forest',
         name: '森林',
         unlocked: stars >= 25,
-        gradient: ['#A7F3D0', '#5EEAD4', '#22D3EE'],
+        gradient: SKIN_GRADIENTS.forest,
       },
       {
         id: 'space',
         name: '宇宙',
         unlocked: stars >= 40,
-        gradient: ['#0F172A', '#581C87', '#312E81'],
+        gradient: SKIN_GRADIENTS.space,
       },
       {
         id: 'sunset',
         name: '晚霞',
         unlocked: totalCorrect >= 30,
-        gradient: ['#FED7AA', '#F9A8D4', '#FB7185'],
+        gradient: SKIN_GRADIENTS.sunset,
       },
     ],
     [maxCombo, stars, totalCorrect],

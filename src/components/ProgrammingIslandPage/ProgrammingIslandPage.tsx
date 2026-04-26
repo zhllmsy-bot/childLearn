@@ -1,13 +1,14 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { ProgrammingLevel } from '../../programming/programmingLevels';
 import { PROGRAMMING_SIZES, PROGRAMMING_PAGE_THEME_VARS, PROGRAMMING_FONT_STACK } from '../../theme/tokens';
+import { useTopBarConfig, type AppTopBarConfig } from '../AppTopBar/AppTopBar';
 import { ProgrammingAmbience } from './ProgrammingAmbience';
 import { ProgrammingBlockDrawer } from './ProgrammingBlockDrawer';
 import { ProgrammingGridStage } from './ProgrammingGridStage';
 import { ProgrammingProgramSlot } from './ProgrammingProgramSlot';
-import { ProgrammingTopBar } from './ProgrammingTopBar';
+import { ProgrammingSettingsMenu } from './ProgrammingSettingsMenu';
 import { useProgrammingSession } from './useProgrammingSession';
 
 interface ProgrammingIslandPageProps {
@@ -82,6 +83,54 @@ export function ProgrammingIslandPage({
     },
     [session],
   );
+  const topBarConfig = useMemo<AppTopBarConfig>(
+    () => ({
+      actions: [
+        {
+          ariaLabel: '打开设置',
+          icon: 'settings',
+          id: 'programming-settings',
+          onClick: () => session.setSettingsOpen(!session.settingsOpen),
+          popover: session.settingsOpen ? (
+            <ProgrammingSettingsMenu
+              onClose={() => session.setSettingsOpen(false)}
+              onPaceChange={session.setPace}
+              pace={session.pace}
+            />
+          ) : null,
+          pressed: session.settingsOpen,
+        },
+        {
+          ariaLabel: session.isMuted ? '打开声音' : '关闭声音',
+          icon: session.isMuted ? 'mute' : 'sound',
+          id: 'programming-sound',
+          onClick: () => session.setIsMuted((current) => !current),
+          pressed: session.isMuted,
+        },
+      ],
+      leadingAction: {
+        ariaLabel: '首页',
+        icon: 'home',
+        id: 'programming-home',
+        onClick: onBack,
+      },
+      progressDots: session.progressDots,
+      title: session.level.title,
+    }),
+    [
+      onBack,
+      session.isMuted,
+      session.level.title,
+      session.pace,
+      session.progressDots,
+      session.settingsOpen,
+      session.setIsMuted,
+      session.setPace,
+      session.setSettingsOpen,
+    ],
+  );
+
+  useTopBarConfig(topBarConfig, 10);
 
   return (
     <DndContext
@@ -99,24 +148,12 @@ export function ProgrammingIslandPage({
           paddingBottom: `calc(var(--safe-bottom) + ${PROGRAMMING_SIZES.blockDrawerHeight + 24}px)`,
           paddingLeft: 'calc(var(--safe-left) + clamp(12px, 2vw, 24px))',
           paddingRight: 'calc(var(--safe-right) + clamp(12px, 2vw, 24px))',
-          paddingTop: 'calc(var(--safe-top) + clamp(12px, 2vw, 24px))',
+          paddingTop: 'clamp(12px, 2vw, 24px)',
         }}
       >
         <ProgrammingAmbience />
         <div className="relative z-10">
-          <ProgrammingTopBar
-            isMuted={session.isMuted}
-            onBack={onBack}
-            onPaceChange={session.setPace}
-            onToggleMute={() => session.setIsMuted((current) => !current)}
-            onToggleSettings={() => session.setSettingsOpen(!session.settingsOpen)}
-            pace={session.pace}
-            progressDots={session.progressDots}
-            settingsOpen={session.settingsOpen}
-            title={session.level.title}
-          />
-
-          <div className="programming-workspace mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.27fr)_minmax(0,1fr)]">
+          <div className="programming-workspace grid gap-6 lg:grid-cols-[minmax(0,1.27fr)_minmax(0,1fr)]">
             <ProgrammingGridStage
               bot={session.bot}
               emotion={session.emotion}

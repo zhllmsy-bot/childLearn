@@ -12,7 +12,7 @@ interface BigButtonProps extends HTMLMotionProps<'button'> {
 const toneShadow: Record<ButtonTone, string> = {
   primary: '0 18px 38px rgba(251, 191, 36, 0.50)',
   success: '0 18px 38px rgba(52, 211, 153, 0.50)',
-  danger: '0 18px 38px rgba(251, 113, 133, 0.50)',
+  danger: '0 18px 38px rgba(245, 158, 11, 0.50)',
   magic: '0 18px 38px rgba(168, 85, 247, 0.50)',
 };
 

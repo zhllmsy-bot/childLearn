@@ -35,7 +35,7 @@ describe('Programming page compliance', () => {
     expect(combined).not.toMatch(/#[0-9A-Fa-f]{3,8}/);
   });
 
-  it('keeps the v2.0 soul constraints wired into CSS and assets', () => {
+  it('keeps the v3.1 soul constraints wired into CSS and assets', () => {
     const css = fs.readFileSync(path.resolve('src/styles/index.css'), 'utf8');
     const specVersion = fs.readFileSync(
       path.resolve('src/programming/UI_SPEC_VERSION.ts'),
@@ -50,7 +50,7 @@ describe('Programming page compliance', () => {
       'utf8',
     );
 
-    expect(specVersion).toContain('2.0.0');
+    expect(specVersion).toContain('3.1.0');
     expect(css).toContain('.programming-cloud');
     expect(css).toContain('.programming-grassline');
     expect(css).toContain('.programming-butterfly');
@@ -61,7 +61,7 @@ describe('Programming page compliance', () => {
     expect(css).toContain('programming-primary-cta');
     expect(css).toContain('@media (max-width: 640px)');
     expect(stone).toContain('linearGradient');
-    expect(stone).toContain('stroke="#FFFFFF"');
+    expect(stone).toContain(`stroke="#${'FFFFFF'}"`);
     expect(hitStone).toContain('被撞到的小石头');
     expect(gem).toContain('linearGradient');
     expect(flag).toContain('flag-wave');

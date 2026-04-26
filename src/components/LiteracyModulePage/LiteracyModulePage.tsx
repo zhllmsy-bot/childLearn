@@ -4,7 +4,6 @@ import { LearningCardModulePage } from '../LearningCardModule/LearningCardModule
 interface LiteracyModulePageProps {
   items: LiteracyItem[];
   selectedItem: LiteracyItem;
-  onBack: () => void;
   onSelectItem: (item: LiteracyItem) => void;
   onSpeakItem: (item: LiteracyItem) => void;
 }
@@ -12,7 +11,6 @@ interface LiteracyModulePageProps {
 export function LiteracyModulePage({
   items,
   selectedItem,
-  onBack,
   onSelectItem,
   onSpeakItem,
 }: LiteracyModulePageProps) {
@@ -31,9 +29,7 @@ export function LiteracyModulePage({
         gridEyebrow: '字卡',
         gridTitle: '全部汉字',
         speakLabel: '读一读',
-        backLabel: '回首页',
       }}
-      onBack={onBack}
       onSelectCard={onSelectItem}
       onSpeakCard={onSpeakItem}
     />

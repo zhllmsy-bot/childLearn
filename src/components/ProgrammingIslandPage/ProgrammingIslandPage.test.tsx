@@ -3,18 +3,22 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { describe, expect, it, vi } from 'vitest';
+import { AppTopBar, AppTopBarProvider } from '../AppTopBar/AppTopBar';
 import { ProgrammingIslandPage } from './ProgrammingIslandPage';
 
 function renderPage() {
   return render(
-    <ProgrammingIslandPage
-      completedLevelIds={[]}
-      initialLevelId="sequence-apple"
-      onBack={vi.fn()}
-      onCompleteLevel={vi.fn()}
-      onSpeak={vi.fn()}
-      unlockedLevelCount={1}
-    />,
+    <AppTopBarProvider>
+      <AppTopBar />
+      <ProgrammingIslandPage
+        completedLevelIds={[]}
+        initialLevelId="sequence-apple"
+        onBack={vi.fn()}
+        onCompleteLevel={vi.fn()}
+        onSpeak={vi.fn()}
+        unlockedLevelCount={1}
+      />
+    </AppTopBarProvider>,
   );
 }
 
@@ -22,7 +26,7 @@ describe('ProgrammingIslandPage', () => {
   it('renders the strict top bar and a single task bubble', () => {
     renderPage();
 
-    expect(screen.getByRole('button', { name: '返回首页' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '首页' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '打开设置' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '关闭声音' })).not.toBeNull();
     expect(screen.getAllByText('让小满一步一步走到能量果。')).toHaveLength(1);

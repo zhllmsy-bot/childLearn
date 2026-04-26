@@ -1,5 +1,13 @@
 # UI Changelog
 
+## 3.0.0 - 2026-04-26
+
+- Promoted the project-wide childLearn UI design soul to v3.0, with `v3.0 > v2.0 > v1.0` priority captured in `AGENTS.md`.
+- Added the local v3 design spec and 58-point self-check in `docs/ui-design-soul-v3.md`.
+- Added token SSoT enums, v3 palette keys, token-injected CSS variables, and a `npm run ui:soul:check` guard for raw colors, banned flat patterns, file budgets, version drift, and programming-page material hooks.
+- Wired Stylelint, ESLint raw-color enforcement, Playwright `toHaveScreenshot`, and `@axe-core/playwright` into local scripts and a GitHub Actions workflow.
+- Replaced the legacy floating Home / speaker controls with the unified 56px TopBar required by v3.
+
 ## 2.0.0 - 2026-04-26
 
 - Upgraded Programming Island from strict metrics compliance to claymorphism/candy-soft/sticker-cut visual DNA.

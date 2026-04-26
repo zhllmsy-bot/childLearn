@@ -29,6 +29,33 @@ const VALID_OBSERVATION = {
     avoid: ['consecutive high-load subtraction'],
   },
   uxSuggestions: ['Add visual support after first miss.'],
+  profileRefinement: {
+    schemaVersion: 'childlearn.profile-refinement.v1',
+    confidence: 0.82,
+    skillAdjustments: [
+      {
+        skillKey: 'makeTen',
+        deltaTheta: -0.12,
+        deltaConfidence: 0.04,
+        reason: 'Recent make-ten prompts needed hints.',
+        evidenceStrength: 'medium',
+      },
+    ],
+    errorPatterns: [
+      {
+        type: 'conceptual',
+        label: '凑十拆分不稳',
+        skillKey: 'makeTen',
+        evidenceQuestionIds: ['q1'],
+      },
+    ],
+    nextSkill: {
+      skillKey: 'makeTen',
+      difficultyAdjustment: 0.3,
+      reason: 'Keep challenge close to this skill.',
+    },
+    safetyNotes: [],
+  },
 };
 
 describe('parseLlmLearningObservation', () => {
@@ -40,6 +67,12 @@ describe('parseLlmLearningObservation', () => {
       recommendation: {
         direction: 'maintain_with_support',
         adjustmentDimension: 'visual_support',
+      },
+      profileRefinement: {
+        confidence: 0.82,
+        nextSkill: {
+          skillKey: 'makeTen',
+        },
       },
     });
   });

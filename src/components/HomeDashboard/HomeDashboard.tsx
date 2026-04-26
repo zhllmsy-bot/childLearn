@@ -172,7 +172,7 @@ function HomeDashboardComponent({
           <motion.div
             animate={{ y: [0, -6, 0] }}
             transition={{ duration: 3.6, repeat: Infinity, ease: 'easeInOut' }}
-            className="mx-auto flex w-full max-w-[18rem] justify-center"
+            className="mx-auto flex w-full max-w-[18rem] justify-center lg:pr-6"
           >
             <XiaomanSprite emotion="happy" className="w-full drop-shadow-xl" />
           </motion.div>

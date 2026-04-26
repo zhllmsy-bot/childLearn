@@ -1,5 +1,12 @@
 import type { QuestionVariant } from '../../curriculum/types';
 import { getVariantsForProgressionLane } from '../../curriculum/mathProgression';
+import {
+  chooseLearnerTargetSkill,
+  skillTheta,
+  thetaToDifficulty,
+  type LearnerProfile,
+  type LearnerSkillKey,
+} from '../../ai/learnerModel';
 import type { ApprovedFlowPolicy } from './types';
 
 export type FlowQuestionLane = 'confidence' | 'review' | 'current' | 'challenge';
@@ -7,10 +14,13 @@ export type FlowQuestionLane = 'confidence' | 'review' | 'current' | 'challenge'
 export interface FlowQuestionPlan {
   lane: FlowQuestionLane;
   difficulty: number;
+  targetSkillKey?: LearnerSkillKey;
+  targetTheta?: number;
   variant?: QuestionVariant;
 }
 
 interface SelectFlowQuestionPlanInput {
+  learnerProfile?: LearnerProfile | null;
   policy: ApprovedFlowPolicy | null;
   fallbackDifficulty: number;
   serial: number;
@@ -63,25 +73,138 @@ function difficultyForLane(lane: FlowQuestionLane, policy: ApprovedFlowPolicy) {
   return clampDifficulty(policy.nextDifficulty);
 }
 
+function variantForSkill(skillKey: LearnerSkillKey): QuestionVariant | null {
+  if (skillKey === 'visualMatching' || skillKey === 'countingTo5') {
+    return 'matching';
+  }
+
+  if (
+    skillKey === 'compareWithin5' ||
+    skillKey === 'compareWithin10' ||
+    skillKey === 'compareWithin20'
+  ) {
+    return 'compare';
+  }
+
+  if (skillKey === 'makeTen' || skillKey === 'crossTenBridge') {
+    return 'makeTen';
+  }
+
+  if (skillKey === 'missingAddend' || skillKey === 'pureNumberReadiness') {
+    return 'missing';
+  }
+
+  if (skillKey === 'numberLineDistance' || skillKey === 'subWithin10') {
+    return 'numberLine';
+  }
+
+  if (skillKey === 'storyAddition') {
+    return 'story';
+  }
+
+  return null;
+}
+
+function targetOffsetForLane(lane: FlowQuestionLane) {
+  if (lane === 'confidence') {
+    return -0.45;
+  }
+
+  if (lane === 'review') {
+    return -0.15;
+  }
+
+  if (lane === 'challenge') {
+    return 0.4;
+  }
+
+  return 0.2;
+}
+
+function learnerPlanAdjustment({
+  baselineDifficulty,
+  lane,
+  learnerProfile,
+}: {
+  baselineDifficulty: number;
+  lane: FlowQuestionLane;
+  learnerProfile?: LearnerProfile | null;
+}) {
+  const targetSkillKey = chooseLearnerTargetSkill(learnerProfile, lane);
+  if (!targetSkillKey || !learnerProfile) {
+    return {
+      difficulty: baselineDifficulty,
+      targetSkillKey: undefined,
+      targetTheta: undefined,
+      variant: undefined,
+    };
+  }
+
+  const targetTheta = skillTheta(learnerProfile, targetSkillKey) + targetOffsetForLane(lane);
+  const thetaDifficulty = thetaToDifficulty(targetTheta);
+  const difficulty = clampDifficulty(
+    Math.min(Math.max(thetaDifficulty, baselineDifficulty - 1), baselineDifficulty + 1),
+  );
+
+  return {
+    difficulty,
+    targetSkillKey,
+    targetTheta,
+    variant: variantForSkill(targetSkillKey) ?? undefined,
+  };
+}
+
 export function selectFlowQuestionPlan({
+  learnerProfile,
   policy,
   fallbackDifficulty,
   serial,
 }: SelectFlowQuestionPlanInput): FlowQuestionPlan {
   if (!policy) {
-    return {
+    const fallback = clampDifficulty(fallbackDifficulty);
+    const learnerAdjustment = learnerPlanAdjustment({
+      baselineDifficulty: fallback,
       lane: 'current',
-      difficulty: clampDifficulty(fallbackDifficulty),
+      learnerProfile,
+    });
+    const plan: FlowQuestionPlan = {
+      lane: 'current',
+      difficulty: learnerAdjustment.difficulty,
     };
+
+    if (learnerAdjustment.targetSkillKey) {
+      plan.targetSkillKey = learnerAdjustment.targetSkillKey;
+      plan.targetTheta = learnerAdjustment.targetTheta;
+    }
+
+    if (learnerAdjustment.variant) {
+      plan.variant = learnerAdjustment.variant;
+    }
+
+    return plan;
   }
 
   const lanes = laneSequence(policy);
   const lane = lanes[serial % lanes.length];
-  const difficulty = difficultyForLane(lane, policy);
+  const baselineDifficulty = difficultyForLane(lane, policy);
+  const learnerAdjustment = learnerPlanAdjustment({
+    baselineDifficulty,
+    lane,
+    learnerProfile,
+  });
+  const difficulty = learnerAdjustment.difficulty;
 
-  return {
+  const plan: FlowQuestionPlan = {
     lane,
     difficulty,
-    variant: variantForLane(lane, serial, difficulty),
+    variant:
+      learnerAdjustment.variant ?? variantForLane(lane, serial, difficulty),
   };
+
+  if (learnerAdjustment.targetSkillKey) {
+    plan.targetSkillKey = learnerAdjustment.targetSkillKey;
+    plan.targetTheta = learnerAdjustment.targetTheta;
+  }
+
+  return plan;
 }

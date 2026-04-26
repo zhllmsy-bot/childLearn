@@ -154,3 +154,33 @@ For future CosyVoice POCs, create the venv with Python 3.10, run `ensurepip`, up
 
 ### See Also
 - LRN-20260424-003
+
+---
+
+## [ERR-20260426-001] tooling
+
+**Logged**: 2026-04-26T03:35:00Z
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+Vitest in this repo does not support Jest's `--runInBand` flag.
+
+### Symptoms
+`npm test -- --runInBand` failed before running tests with `CACError: Unknown option --runInBand`.
+
+### Diagnosis
+The project uses Vitest 4.1.5; this CLI does not accept the Jest-style serial execution flag.
+
+### Workaround
+Use the repository script directly: `npm test`.
+
+### Suggested Fix
+For future one-off test runs, pass only Vitest-supported flags or use the plain project scripts first.
+
+### Related Files
+- package.json
+
+### See Also
+- None

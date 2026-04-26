@@ -1,4 +1,4 @@
-import { Award, Flame, Gift, Home, RotateCcw, Sparkles, Star, Trophy } from 'lucide-react';
+import { Award, Flame, Gift, RotateCcw, Sparkles, Star, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import type { Sticker } from '../../engagement/collection/useStickers';
@@ -20,7 +20,6 @@ interface LevelResultProps {
   sticker: Sticker | null;
   gardenReward: GardenReward;
   newSpirits: NumberSpirit[];
-  onHome: () => void;
   onRetry: () => void;
   onContinue: () => void;
   onInspectSticker?: (sticker: Sticker) => void;
@@ -142,7 +141,6 @@ export function LevelResult({
   sticker,
   gardenReward,
   newSpirits,
-  onHome,
   onRetry,
   onContinue,
   onInspectSticker,
@@ -234,16 +232,7 @@ export function LevelResult({
         ) : null}
       </div>
 
-      <div className="grid w-full gap-3 md:grid-cols-3">
-        <BigButton
-          type="button"
-          tone="primary"
-          onClick={onHome}
-          className="flex items-center justify-center gap-3 rounded-3xl px-6 py-4 text-2xl"
-        >
-          <Home size={32} strokeWidth={3.2} />
-          回小岛
-        </BigButton>
+      <div className="grid w-full gap-3 md:grid-cols-2">
         <BigButton
           type="button"
           tone="success"

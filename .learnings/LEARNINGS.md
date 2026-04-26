@@ -103,3 +103,31 @@ If CosyVoice is integrated, pre-generate stable stage lines and cache dynamic qu
 
 ### See Also
 - ERR-20260424-004
+
+---
+
+## [LRN-20260426-001] best-practice
+
+**Logged**: 2026-04-26T02:49:47Z
+**Priority**: high
+**Status**: active
+**Area**: frontend
+
+### Summary
+childLearn UI v3.1 is the active full-app design authority.
+
+### Details
+The project now treats v3.1 as higher priority than v3.0, v2.0, and v1.0. UI work must preserve the four genes: claymorphism, candy-soft color, sticker-cut edging, and breathing motion. Colors must come from `src/theme/tokens.ts`, and raw hex is banned outside that token source. Home, sound/mute, settings, and back controls must render only through `AppTopBar` via `useTopBarConfig`; fixed or absolute floating nav buttons are a blocker. The full-app automation path includes Stylelint, ESLint raw-color enforcement, TopBar architecture guard, Playwright screenshot baselines at 600/900/1200 widths, and axe critical/serious checks.
+
+### Suggested Action
+Before UI handoff, read `docs/ui-design-soul-v3.md` and run `npm run lint`, `npm test`, and `npm run test:e2e`. Keep `src/programming/UI_SPEC_VERSION.ts` at the active spec version when constraints change.
+
+### Related Files
+- AGENTS.md
+- docs/ui-design-soul-v3.md
+- src/theme/tokens.ts
+- tools/check_ui_design_soul.mjs
+- e2e/ui-soul.spec.ts
+
+### See Also
+- None
