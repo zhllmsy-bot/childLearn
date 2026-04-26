@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { defaultLearningSyncUrl } from '../ai/api/childlearnAi';
 import { resolveRuntimeUrl } from '../network/runtimeUrl';
 import { track } from '../telemetry/track';
 
@@ -46,13 +47,11 @@ export interface MergeResult {
   changedKeys: LearningStorageKey[];
 }
 
-const LEARNING_SYNC_URL = import.meta.env.VITE_LEARNING_SYNC_URL?.trim();
+const LEARNING_SYNC_URL = defaultLearningSyncUrl();
 const CONFIGURED_CHILD_ID = import.meta.env.VITE_LEARNING_CHILD_ID?.trim();
 const CHILD_ID_STORAGE_KEY = 'childlearn.child-id';
 const DEVICE_ID_STORAGE_KEY = 'childlearn.device-id';
 const PUSH_DEBOUNCE_MS = 800;
-const CONFIGURED_SYNC_TOKEN = import.meta.env.VITE_LEARNING_SYNC_TOKEN?.trim();
-
 let pushTimer: number | undefined;
 let pendingReason = 'unknown';
 let inFlightPush: Promise<void> | null = null;
@@ -614,7 +613,6 @@ async function pushLearningStateSnapshot(reason: string) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(CONFIGURED_SYNC_TOKEN ? { Authorization: `Bearer ${CONFIGURED_SYNC_TOKEN}` } : {}),
       },
       body: JSON.stringify({ reason, state: envelope }),
       keepalive: true,
@@ -666,9 +664,7 @@ async function pullLearningStateSnapshot() {
 
   const childId = encodeURIComponent(getChildId());
   const response = await fetch(`${learningSyncUrl}?childId=${childId}`, {
-    headers: {
-      ...(CONFIGURED_SYNC_TOKEN ? { Authorization: `Bearer ${CONFIGURED_SYNC_TOKEN}` } : {}),
-    },
+    headers: {},
   });
   if (!response.ok) {
     throw new Error(`sync pull failed: ${response.status}`);

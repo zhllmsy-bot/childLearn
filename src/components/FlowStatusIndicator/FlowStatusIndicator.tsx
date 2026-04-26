@@ -6,6 +6,7 @@ import type { LearnerFlowState } from '../../ai/learnerModel';
 interface FlowStatusIndicatorProps {
   flowState?: FlowState | null;
   learnerFlowState?: LearnerFlowState | null;
+  note?: string | null;
   observerStatus?: FlowObserverStatus | null;
 }
 
@@ -63,29 +64,32 @@ export function FlowStatusIndicator(props: FlowStatusIndicatorProps) {
   const tone = resolveTone(props);
   const markerIndex = markerIndexForTone(tone);
   const label = FLOW_TONE_LABELS[tone];
+  const note = props.note?.trim();
 
   return (
-    <div
-      aria-label={`心流状态：${label}`}
-      aria-live="polite"
-      className={`flow-status-indicator flow-status-indicator--${tone}`}
-      role="status"
-    >
-      {tone === 'thinking' ? (
-        <Cog aria-hidden="true" className="flow-status-gear" size={16} strokeWidth={3} />
-      ) : null}
-      <span className="flow-status-label">{label}</span>
-      <span aria-hidden="true" className="flow-status-track">
-        {[0, 1, 2].map((index) => (
-          <span
-            className={`flow-status-dot${
-              index === markerIndex ? ' flow-status-dot--active' : ''
-            }`}
-            key={index}
-          />
-        ))}
-      </span>
+    <div className="flow-status-stack">
+      <div
+        aria-label={`心流状态：${label}`}
+        aria-live="polite"
+        className={`flow-status-indicator flow-status-indicator--${tone}`}
+        role="status"
+      >
+        {tone === 'thinking' ? (
+          <Cog aria-hidden="true" className="flow-status-gear" size={16} strokeWidth={3} />
+        ) : null}
+        <span className="flow-status-label">{label}</span>
+        <span aria-hidden="true" className="flow-status-track">
+          {[0, 1, 2].map((index) => (
+            <span
+              className={`flow-status-dot${
+                index === markerIndex ? ' flow-status-dot--active' : ''
+              }`}
+              key={index}
+            />
+          ))}
+        </span>
+      </div>
+      {note ? <span className="flow-status-note">{note}</span> : null}
     </div>
   );
 }
-

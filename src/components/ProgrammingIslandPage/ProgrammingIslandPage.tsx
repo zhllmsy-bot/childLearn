@@ -19,6 +19,18 @@ interface ProgrammingIslandPageProps {
     level: ProgrammingLevel,
     result: ProgrammingCompletionResult,
   ) => void;
+  onRequestHint: (payload: {
+    allowedCommands: string[];
+    blockedReason?: string;
+    currentProgramKinds: string[];
+    fallbackHint: string;
+    levelId: string;
+    levelPrompt: string;
+    levelTitle: string;
+    remainingGems: number;
+    requiredKinds: string[];
+    status: string;
+  }) => Promise<string | null>;
   onSpeak: (text: string) => void;
   unlockedLevelCount: number;
 }
@@ -36,6 +48,7 @@ export function ProgrammingIslandPage({
   initialLevelId,
   onBack,
   onCompleteLevel,
+  onRequestHint,
   onSpeak,
   unlockedLevelCount,
 }: ProgrammingIslandPageProps) {
@@ -43,6 +56,7 @@ export function ProgrammingIslandPage({
     completedLevelIds,
     initialLevelId,
     onCompleteLevel,
+    onRequestHint,
     onSpeak,
     unlockedLevelCount,
   });

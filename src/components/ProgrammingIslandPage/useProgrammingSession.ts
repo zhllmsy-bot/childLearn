@@ -36,6 +36,18 @@ interface ProgrammingSessionOptions {
     level: ProgrammingLevel,
     result: ProgrammingCompletionResult,
   ) => void;
+  onRequestHint: (payload: {
+    allowedCommands: string[];
+    blockedReason?: string;
+    currentProgramKinds: string[];
+    fallbackHint: string;
+    levelId: string;
+    levelPrompt: string;
+    levelTitle: string;
+    remainingGems: number;
+    requiredKinds: string[];
+    status: string;
+  }) => Promise<string | null>;
   onSpeak: (text: string) => void;
   unlockedLevelCount: number;
 }
@@ -111,10 +123,20 @@ function cloneWithFreshIds(block: Block, makeId: () => string): Block {
   };
 }
 
+function collectBlockKinds(blocks: Block[]): string[] {
+  return blocks.flatMap((block) => [
+    block.kind,
+    ...(block.body ? collectBlockKinds(block.body) : []),
+    ...(block.branchTrue ? collectBlockKinds(block.branchTrue) : []),
+    ...(block.branchFalse ? collectBlockKinds(block.branchFalse) : []),
+  ]);
+}
+
 export function useProgrammingSession({
   completedLevelIds,
   initialLevelId,
   onCompleteLevel,
+  onRequestHint,
   onSpeak,
   unlockedLevelCount,
 }: ProgrammingSessionOptions) {
@@ -531,8 +553,36 @@ export function useProgrammingSession({
       return;
     }
     setHintUsesLeft((current) => Math.max(0, current - 1));
-    setNarration(level.hintVoice, true);
-  }, [hintUsesLeft, level.hintVoice, setNarration]);
+    setNarration('小满正在想办法……', true);
+    void onRequestHint({
+      allowedCommands: [...level.allowedCommands],
+      blockedReason: runNote || undefined,
+      currentProgramKinds: collectBlockKinds(program),
+      fallbackHint: level.hintVoice,
+      levelId: level.id,
+      levelPrompt: level.prompt,
+      levelTitle: level.title,
+      remainingGems: remainingGems.length,
+      requiredKinds: [...(level.requiredKinds ?? [])],
+      status,
+    }).then((hint) => {
+      setNarration(hint || level.hintVoice, true);
+    });
+  }, [
+    hintUsesLeft,
+    level.allowedCommands,
+    level.hintVoice,
+    level.id,
+    level.prompt,
+    level.requiredKinds,
+    level.title,
+    onRequestHint,
+    program,
+    remainingGems.length,
+    runNote,
+    setNarration,
+    status,
+  ]);
 
   const goToNextLevel = useCallback(() => {
     if (canAdvanceLevel) {

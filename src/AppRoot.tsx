@@ -16,6 +16,7 @@ import { FlowStatusIndicator } from './components/FlowStatusIndicator/FlowStatus
 import { HomeDashboard } from './components/HomeDashboard/HomeDashboard';
 import { LevelResult } from './components/LevelResult/LevelResult';
 import { ParentReportPanel } from './components/ParentReportPanel/ParentReportPanel';
+import { ParentGate } from './components/ParentGate/ParentGate';
 import { PracticeSession } from './components/PracticeSession/PracticeSession';
 import { StickerActionModal } from './components/StickerActionModal/StickerActionModal';
 import {
@@ -25,6 +26,17 @@ import {
   type AppTopBarConfig,
 } from './components/AppTopBar/AppTopBar';
 import { useLearnerProfile } from './ai/useLearnerProfile';
+import {
+  LEARNER_RADAR_SKILLS,
+  LEARNER_SKILL_DEFINITIONS,
+  thetaToDifficulty,
+} from './ai/learnerModel';
+import {
+  buildAdaptiveQuestionPayload,
+  requestCoPilotQuestion,
+  requestParentSummary,
+  requestProgrammingHint,
+} from './ai/api/childlearnAi';
 import { generateQuestion } from './curriculum/questionFactory';
 import {
   DIAGNOSTIC_QUESTION_COUNT,
@@ -71,6 +83,7 @@ import {
 } from './engagement/reward/useNumberSpirits';
 import { useRewardGarden, type GardenReward } from './engagement/reward/useRewardGarden';
 import { recordLearningHistory } from './engagement/report/learningHistory';
+import { createLearningHistorySummary } from './engagement/report/learningHistory';
 import { useSkinUnlock } from './engagement/skin/useSkinUnlock';
 import {
   STICKER_UNLOCK_COMBO_INTERVAL,
@@ -242,7 +255,13 @@ function AppRootContent() {
   const reviewQueueRef = useRef<ReviewItem[]>(
     initialAppSnapshot?.reviewQueue ?? [],
   );
+  const [parentGateOpen, setParentGateOpen] = useState(false);
   const [parentReportOpen, setParentReportOpen] = useState(false);
+  const [parentSummary, setParentSummary] = useState<string | null>(null);
+  const [parentSummaryStatus, setParentSummaryStatus] = useState<
+    'idle' | 'pending' | 'ready' | 'failed'
+  >('idle');
+  const [questionBooting, setQuestionBooting] = useState(false);
   const [selectedSticker, setSelectedSticker] = useState<Sticker | null>(
     () => findStickerById(initialAppSnapshot?.selectedStickerId) ?? null,
   );
@@ -275,6 +294,9 @@ function AppRootContent() {
   const currentRunModeRef = useRef<PracticeRunMode>(
     initialAppSnapshot?.currentRunMode ?? 'level',
   );
+  const flowObservationRef = useRef<LlmLearningObservation | null>(
+    initialAppSnapshot?.flowObservation ?? null,
+  );
   const diagnosticRunSeedRef = useRef<number | null>(
     initialAppSnapshot?.diagnosticRunSeed ?? null,
   );
@@ -294,6 +316,7 @@ function AppRootContent() {
   );
   const flowObserverRequestIdRef = useRef(0);
   const lastEvaluatedAttemptCountRef = useRef(0);
+  const privacyHref = import.meta.env.VITE_PARENT_PRIVACY_URL?.trim() || '/privacy.html';
 
   const combo = useCombo();
   const dda = useDDA();
@@ -321,6 +344,47 @@ function AppRootContent() {
   );
   const homeLevelGoal =
     scene === 'home' && !activeLevelPackId ? upcomingLevelPack.items.length : levelQuestionGoal;
+  const historySummary = useMemo(() => createLearningHistorySummary(), [learner.profile.updatedAt]);
+  const suggestedMinutes =
+    historySummary.today.attempted >= 12
+      ? '今天已经够了，明天 8 分钟轻复习'
+      : '建议今天 8-12 分钟，优先做巩固包';
+  const parentSummaryPayload = useMemo(
+    () => ({
+      accuracy:
+        stats.attempted === 0 ? 100 : Math.round((stats.correct / stats.attempted) * 100),
+      attempted: stats.attempted,
+      correct: stats.correct,
+      difficulty: dda.difficulty,
+      flowAction: flowShadowPolicy?.finalAction ?? null,
+      flowObserverIssue: flowObservation?.primaryIssue ?? null,
+      flowObserverReason: flowObservation?.stateReason ?? null,
+      flowState: flowShadowPolicy?.finalState ?? null,
+      focusSkills: historySummary.focusSkills.map((skill) => ({
+        count: skill.count,
+        key: skill.key,
+      })),
+      learnerRadar: LEARNER_RADAR_SKILLS.map((skillKey) => ({
+        label: LEARNER_SKILL_DEFINITIONS[skillKey].label,
+        theta: learner.profile.skills[skillKey]?.theta ?? 0,
+      })),
+      recommendedMinutes: suggestedMinutes,
+      reviewQueueSize: reviewQueue.length,
+    }),
+    [
+      dda.difficulty,
+      flowObservation?.primaryIssue,
+      flowObservation?.stateReason,
+      flowShadowPolicy?.finalAction,
+      flowShadowPolicy?.finalState,
+      historySummary.focusSkills,
+      learner.profile.skills,
+      reviewQueue.length,
+      stats.attempted,
+      stats.correct,
+      suggestedMinutes,
+    ],
+  );
 
   const {
     schedule,
@@ -337,6 +401,31 @@ function AppRootContent() {
   useEffect(() => {
     learnerProfileRef.current = learner.profile;
   }, [learner.profile]);
+
+  useEffect(() => {
+    flowObservationRef.current = flowObservation;
+  }, [flowObservation]);
+
+  useEffect(() => {
+    if (!parentReportOpen) {
+      return;
+    }
+
+    let cancelled = false;
+    setParentSummaryStatus('pending');
+    void requestParentSummary(parentSummaryPayload).then((summary) => {
+      if (cancelled) {
+        return;
+      }
+
+      setParentSummary(summary);
+      setParentSummaryStatus(summary ? 'ready' : 'failed');
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [parentReportOpen, parentSummaryPayload]);
 
   useEffect(() => {
     if (scene !== 'home') {
@@ -369,6 +458,7 @@ function AppRootContent() {
         runId: practiceRunIdRef.current,
         questionId: targetQuestion.id,
         questionIndex: targetQuestionIndex,
+        questionSource: targetQuestion.source,
         level: targetQuestion.level,
         variant: targetQuestion.variant,
         fact: targetQuestion.factId,
@@ -534,6 +624,7 @@ function AppRootContent() {
       setFlowShadowReport(report);
       setFlowShadowPolicy(policy);
       setFlowObservation(null);
+      flowObservationRef.current = null;
       if (trigger === 'interim') {
         currentRunPolicyRef.current = policy;
         currentRunPolicyBatchIdRef.current = batchId;
@@ -632,6 +723,7 @@ function AppRootContent() {
           filteredPolicy.finalState,
         ].slice(-5);
         setFlowObservation(observation);
+        flowObservationRef.current = observation;
         setFlowObserverStatus('ready');
         setFlowShadowPolicy(filteredPolicy);
         if (trigger === 'interim') {
@@ -753,7 +845,7 @@ function AppRootContent() {
     [isCurrentFlow, speak, waitFor],
   );
 
-  const generateAdaptiveQuestion = useCallback((difficulty: number, serial: number) => {
+  const loadAdaptiveQuestion = useCallback(async (difficulty: number, serial: number) => {
     if (currentRunModeRef.current === 'diagnostic' && serial < DIAGNOSTIC_QUESTION_COUNT) {
       return getDiagnosticQuestion(serial, diagnosticRunSeedRef.current ?? 1);
     }
@@ -766,12 +858,32 @@ function AppRootContent() {
       };
     }
 
-    const plan = selectFlowQuestionPlan({
+    const localPlan = selectFlowQuestionPlan({
       learnerProfile: learnerProfileRef.current,
       policy: currentRunPolicyRef.current,
       fallbackDifficulty: difficulty,
       serial,
     });
+    const observerSuggestion =
+      flowObservationRef.current?.confidence && flowObservationRef.current.confidence >= 0.65
+        ? flowObservationRef.current.nextItemSuggestion
+        : undefined;
+    const suggestionDifficulty = observerSuggestion
+      ? Math.min(
+          Math.max(
+            thetaToDifficulty(observerSuggestion.targetTheta),
+            Math.max(localPlan.difficulty - 1, 1),
+          ),
+          Math.min(localPlan.difficulty + 1, 10),
+        )
+      : localPlan.difficulty;
+    const plan = {
+      ...localPlan,
+      difficulty: suggestionDifficulty,
+      targetSkillKey: observerSuggestion?.targetSkillKey ?? localPlan.targetSkillKey,
+      targetTheta: observerSuggestion?.targetTheta ?? localPlan.targetTheta,
+      variant: observerSuggestion?.variant ?? localPlan.variant,
+    };
     const packId = activeLevelPackIdRef.current;
     const packPlan = packId
       ? selectLevelPackQuestionPlan({
@@ -782,6 +894,20 @@ function AppRootContent() {
           flowVariant: plan.variant,
         })
       : null;
+
+    const payload = buildAdaptiveQuestionPayload({
+      difficulty: packPlan?.difficulty ?? plan.difficulty,
+      lane: plan.lane,
+      learnerProfile: learnerProfileRef.current,
+      serial,
+      targetSkillKey: plan.targetSkillKey,
+      targetTheta: plan.targetTheta,
+      variant: packPlan?.variant ?? plan.variant,
+    });
+    const aiQuestion = await requestCoPilotQuestion(payload);
+    if (aiQuestion) {
+      return aiQuestion;
+    }
 
     return generateQuestion({
       difficulty: packPlan?.difficulty ?? plan.difficulty,
@@ -838,9 +964,13 @@ function AppRootContent() {
   }, [answered, question, questionEventPayload, questionIndex, scene, selectedOptionId]);
 
   const nextQuestion = useCallback(
-    (difficulty: number, flowId?: number) => {
+    async (difficulty: number, flowId?: number) => {
       const nextIndex = questionIndex + 1;
-      const next = generateAdaptiveQuestion(difficulty, nextIndex);
+      const next = await loadAdaptiveQuestion(difficulty, nextIndex);
+      if (flowId && !isCurrentFlow(flowId)) {
+        return;
+      }
+
       setQuestionIndex(nextIndex);
       setQuestion(next);
       beginQuestionTelemetry(next, nextIndex);
@@ -855,7 +985,8 @@ function AppRootContent() {
     },
     [
       beginQuestionTelemetry,
-      generateAdaptiveQuestion,
+      isCurrentFlow,
+      loadAdaptiveQuestion,
       questionIndex,
       readQuestionAfterDelay,
     ],
@@ -989,9 +1120,6 @@ function AppRootContent() {
           startingPolicy?.batchSize ?? levelPack.items.length,
           levelPack.items.length,
         );
-    const firstQuestion = shouldRunDiagnostic
-      ? getDiagnosticQuestion(0, diagnosticSeed ?? 1)
-      : generateAdaptiveQuestion(difficulty, 0);
     const line = buildStartVoiceLine();
 
     clearScheduled();
@@ -1001,7 +1129,6 @@ function AppRootContent() {
       dda.applyDifficulty(difficulty);
     }
     setQuestionIndex(0);
-    setQuestion(firstQuestion);
     setSelectedOptionId(null);
     setFeedback(null);
     setAnswered(false);
@@ -1018,17 +1145,33 @@ function AppRootContent() {
     setFlowShadowReport(null);
     setFlowShadowPolicy(null);
     setFlowObservation(null);
+    flowObservationRef.current = null;
     setFlowObserverStatus(FLOW_OBSERVER_URL ? 'idle' : 'unconfigured');
     levelAttemptRecordsRef.current = [];
     lastEvaluatedAttemptCountRef.current = 0;
-    beginQuestionTelemetry(firstQuestion, 0);
     setScene('practice');
-    void speak(line);
-    readQuestionAfterDelay(
-      firstQuestion,
-      flowId,
-      estimateVoiceLineDurationMs(line) + INTRO_TO_QUESTION_GAP_MS,
-    );
+    setQuestionBooting(true);
+
+    void (async () => {
+      const firstQuestion = shouldRunDiagnostic
+        ? getDiagnosticQuestion(0, diagnosticSeed ?? 1)
+        : await loadAdaptiveQuestion(difficulty, 0);
+
+      if (!isCurrentFlow(flowId)) {
+        return;
+      }
+
+      setQuestion(firstQuestion);
+      beginQuestionTelemetry(firstQuestion, 0);
+      setQuestionBooting(false);
+      void speak(line);
+      readQuestionAfterDelay(
+        firstQuestion,
+        flowId,
+        estimateVoiceLineDurationMs(line) + INTRO_TO_QUESTION_GAP_MS,
+      );
+    })();
+
     track('practice.open', {
       runId,
       difficulty,
@@ -1063,7 +1206,8 @@ function AppRootContent() {
     dda,
     flowShadowReport?.batchId,
     flowShadowPolicy,
-    generateAdaptiveQuestion,
+    isCurrentFlow,
+    loadAdaptiveQuestion,
     readQuestionAfterDelay,
     speak,
     stop,
@@ -1169,6 +1313,22 @@ function AppRootContent() {
     [speak],
   );
 
+  const handleRequestProgrammingHint = useCallback(
+    async (payload: {
+      allowedCommands: string[];
+      blockedReason?: string;
+      currentProgramKinds: string[];
+      fallbackHint: string;
+      levelId: string;
+      levelPrompt: string;
+      levelTitle: string;
+      remainingGems: number;
+      requiredKinds: string[];
+      status: string;
+    }) => requestProgrammingHint(payload),
+    [],
+  );
+
   const handleCompleteProgrammingLevel = useProgrammingRewards({
     addToast,
     combo,
@@ -1186,9 +1346,19 @@ function AppRootContent() {
   const handleRestartDiagnostic = useCallback(() => {
     clearDiagnosticSnapshot();
     setParentReportOpen(false);
+    setParentGateOpen(false);
     resetLevelRun();
     track('diagnostic.reset_requested', {});
   }, [resetLevelRun]);
+
+  const handleOpenParentGate = useCallback(() => {
+    setParentGateOpen(true);
+  }, []);
+
+  const handleParentGateSuccess = useCallback(() => {
+    setParentGateOpen(false);
+    setParentReportOpen(true);
+  }, []);
 
   const handleSound = useAppVoicePrompt({
     activeQuestionTelemetryRef,
@@ -1823,6 +1993,27 @@ function AppRootContent() {
                 : scene === 'practice'
                   ? '本关练习'
                   : `${currentSkin.name}摘果`;
+    let flowStatusNote: string | null = null;
+    if (scene === 'practice') {
+      if (flowObserverStatus === 'pending') {
+        flowStatusNote = '刚刚几题在整理中';
+      } else if (flowObserverStatus === 'ready') {
+        flowStatusNote =
+          flowObservation?.nextItemSuggestion?.reason ??
+          flowObservation?.stateReason ??
+          null;
+      } else if (
+        flowObserverStatus === 'unconfigured' ||
+        flowObserverStatus === 'failed'
+      ) {
+        flowStatusNote =
+          question.source === 'llm'
+            ? '协作助手稍后会继续加入'
+            : '当前先用练习题库陪练';
+      } else if (question.source === 'template') {
+        flowStatusNote = '这题先用练习题库陪练';
+      }
+    }
     const actions: AppTopBarConfig['actions'] = [
       {
         ariaLabel: '播放语音',
@@ -1843,11 +2034,10 @@ function AppRootContent() {
 
     if (scene !== 'programming') {
       actions.push({
-        ariaLabel: '长按打开家长报告',
-        holdMs: 3000,
+        ariaLabel: '打开家长入口',
         icon: 'parent-report',
         id: 'parent-report',
-        onHold: () => setParentReportOpen(true),
+        onClick: handleOpenParentGate,
       });
     }
 
@@ -1864,6 +2054,7 @@ function AppRootContent() {
           <FlowStatusIndicator
             flowState={flowShadowPolicy?.finalState ?? flowShadowReport?.rulePreState ?? null}
             learnerFlowState={learner.profile.flowState}
+            note={flowStatusNote}
             observerStatus={flowObserverStatus}
           />
         ) : null,
@@ -1872,12 +2063,16 @@ function AppRootContent() {
   }, [
     currentSkin.name,
     flowObserverStatus,
+    flowObservation?.nextItemSuggestion?.reason,
+    flowObservation?.stateReason,
     flowShadowPolicy?.finalState,
     flowShadowReport?.rulePreState,
     handleHome,
+    handleOpenParentGate,
     handleOpenStickerAlbum,
     handleSound,
     learner.profile.flowState,
+    question.source,
     scene,
   ]);
 
@@ -1931,6 +2126,7 @@ function AppRootContent() {
             onOpenEnglish={handleOpenEnglish}
             onOpenStickerAlbum={handleOpenStickerAlbum}
             onInspectSticker={handleInspectSticker}
+            privacyHref={privacyHref}
           />
         ) : scene === 'literacy' ? (
           <LiteracyModulePage
@@ -1953,6 +2149,7 @@ function AppRootContent() {
             key="programming"
             onBack={handleHome}
             onSpeak={handleSpeakProgramming}
+            onRequestHint={handleRequestProgrammingHint}
             onCompleteLevel={handleCompleteProgrammingLevel}
             completedLevelIds={programmingProgress.completedLevelIds}
             unlockedLevelCount={programmingProgress.unlockedLevelCount}
@@ -1984,21 +2181,25 @@ function AppRootContent() {
             onInspectSticker={handleInspectSticker}
           />
         ) : (
-          <PracticeSession
-            key="practice"
-            question={question}
-            answered={answered}
-            hintStage={hintStage}
-            levelProgress={levelProgress}
-            levelQuestionGoal={levelQuestionGoal}
-            optionStates={optionStates}
-            rankName={rank.rank.name}
-            rankStars={rank.rank.starLabel}
-            stickerCount={stickers.collected.length}
-            stickerTotal={stickers.total}
-            difficulty={dda.difficulty}
-            onSelect={handleSelect}
-          />
+          questionBooting ? (
+            <SkeletonScreen key="practice-booting" />
+          ) : (
+            <PracticeSession
+              key="practice"
+              question={question}
+              answered={answered}
+              hintStage={hintStage}
+              levelProgress={levelProgress}
+              levelQuestionGoal={levelQuestionGoal}
+              optionStates={optionStates}
+              rankName={rank.rank.name}
+              rankStars={rank.rank.starLabel}
+              stickerCount={stickers.collected.length}
+              stickerTotal={stickers.total}
+              difficulty={dda.difficulty}
+              onSelect={handleSelect}
+            />
+          )
         )}
       </AnimatePresence>
       </Suspense>
@@ -2014,6 +2215,13 @@ function AppRootContent() {
           />
         ) : null}
       </AnimatePresence>
+
+      <ParentGate
+        open={parentGateOpen}
+        onClose={() => setParentGateOpen(false)}
+        onSuccess={handleParentGateSuccess}
+        privacyHref={privacyHref}
+      />
 
       <ParentReportPanel
         open={parentReportOpen}
@@ -2036,6 +2244,10 @@ function AppRootContent() {
         flowObserverReason={flowObservation?.stateReason ?? null}
         flowObserverIssue={flowObservation?.primaryIssue ?? null}
         learnerProfile={learner.profile}
+        parentSummary={parentSummary}
+        parentSummaryStatus={parentSummaryStatus}
+        privacyHref={privacyHref}
+        questionSource={question.source}
       />
       <ToastStack messages={toasts} />
     </main>

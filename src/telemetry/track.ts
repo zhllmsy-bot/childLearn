@@ -1,4 +1,4 @@
-import { resolveRuntimeUrl } from '../network/runtimeUrl';
+import { resolveChildlearnEndpoint } from '../network/runtimeUrl';
 import { createTrackingContext, type TrackingContext } from './context';
 
 export type TrackingPayload = Record<
@@ -12,6 +12,7 @@ export interface TrackingDetail extends TrackingContext {
 }
 
 const CONFIGURED_TELEMETRY_URL = import.meta.env.VITE_TELEMETRY_URL?.trim();
+const DEFAULT_TELEMETRY_ACTION = '/api/telemetry';
 const TELEMETRY_QUEUE_STORAGE_KEY = 'childlearn.telemetry-queue-v1';
 const MAX_QUEUED_EVENTS = 200;
 const BASE_RETRY_DELAY_MS = 5_000;
@@ -37,7 +38,11 @@ export function createTrackingDetail(
 }
 
 function getTelemetryUrl() {
-  return resolveRuntimeUrl(CONFIGURED_TELEMETRY_URL);
+  return resolveChildlearnEndpoint({
+    configuredUrl: CONFIGURED_TELEMETRY_URL,
+    fallbackUrl: DEFAULT_TELEMETRY_ACTION,
+    legacyPaths: ['/track'],
+  });
 }
 
 function normalizeQueuedTelemetryEvent(value: unknown): QueuedTelemetryEvent | null {

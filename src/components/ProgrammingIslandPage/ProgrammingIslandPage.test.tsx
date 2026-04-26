@@ -15,6 +15,7 @@ function renderPage() {
         initialLevelId="sequence-apple"
         onBack={vi.fn()}
         onCompleteLevel={vi.fn()}
+        onRequestHint={vi.fn().mockResolvedValue(null)}
         onSpeak={vi.fn()}
         unlockedLevelCount={1}
       />

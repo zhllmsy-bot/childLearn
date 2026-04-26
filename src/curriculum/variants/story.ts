@@ -10,6 +10,7 @@ export function buildStoryQuestion(
   return {
     id: `story-${level}-${first}-${second}`,
     level,
+    source: 'template',
     variant: 'story',
     factId: `${first}+${second}`,
     prompt: `小兔先摘了 ${first} 个，又摘了 ${second} 个，一共有几个？`,

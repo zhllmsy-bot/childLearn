@@ -10,6 +10,7 @@ export function buildNumberLineQuestion(
   return {
     id: `number-line-${level}-${start}-${end}`,
     level,
+    source: 'template',
     variant: 'numberLine',
     factId: `jump-${start}-${end}`,
     prompt: '从小旗子跳到星星，要跳几步？',

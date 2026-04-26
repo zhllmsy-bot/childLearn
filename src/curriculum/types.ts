@@ -23,6 +23,7 @@ export interface Question {
   id: string;
   level: QuestionLevel;
   variant: QuestionVariant;
+  source: 'template' | 'llm';
   factId: string;
   prompt: string;
   expression: string;

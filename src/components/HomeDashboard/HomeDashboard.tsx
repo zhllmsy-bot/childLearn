@@ -11,6 +11,7 @@ import { SPRING } from '../../theme/springs';
 import { BigButton } from '../_primitives/BigButton';
 import { StickerArtwork } from '../_primitives/StickerArtwork';
 import { XiaomanSprite } from '../_primitives/XiaomanSprite';
+import { PrivacyNotice } from '../PrivacyNotice/PrivacyNotice';
 
 interface HomeDashboardProps {
   rankName: string;
@@ -39,6 +40,7 @@ interface HomeDashboardProps {
   onOpenEnglish: () => void;
   onOpenStickerAlbum: () => void;
   onInspectSticker: (sticker: Sticker) => void;
+  privacyHref?: string;
 }
 
 function progressPercent(current: number, total: number) {
@@ -107,6 +109,7 @@ function HomeDashboardComponent({
   onOpenEnglish,
   onOpenStickerAlbum,
   onInspectSticker,
+  privacyHref,
 }: HomeDashboardProps) {
   const latestSticker = stickers[stickers.length - 1] ?? null;
   const unlockedSpiritCount = spirits.filter((spirit) => spirit.unlocked).length;
@@ -260,6 +263,8 @@ function HomeDashboardComponent({
           )}
         </div>
       </section>
+
+      <PrivacyNotice href={privacyHref} />
     </motion.section>
   );
 }

@@ -19,6 +19,8 @@ import {
   type LearnerProfile,
 } from '../../ai/learnerModel';
 import { StickerArtwork } from '../_primitives/StickerArtwork';
+import { PrivacyNotice } from '../PrivacyNotice/PrivacyNotice';
+import type { Question } from '../../curriculum/types';
 
 interface ParentReportPanelProps {
   open: boolean;
@@ -41,6 +43,10 @@ interface ParentReportPanelProps {
   flowObserverReason?: string | null;
   flowObserverIssue?: string | null;
   learnerProfile?: LearnerProfile;
+  parentSummary?: string | null;
+  parentSummaryStatus?: 'idle' | 'pending' | 'ready' | 'failed';
+  privacyHref?: string;
+  questionSource?: Question['source'] | null;
 }
 
 const FLOW_STATE_LABELS: Record<string, string> = {
@@ -61,11 +67,16 @@ const FLOW_ACTION_LABELS: Record<string, string> = {
 };
 
 const FLOW_OBSERVER_STATUS_LABELS: Record<string, string> = {
-  unconfigured: '未配置观察员',
+  unconfigured: '协作助手未接通',
   idle: '等待本关完成',
-  pending: '观察员分析中',
-  ready: '观察员已参与',
-  failed: '观察员暂不可用',
+  pending: '协作助手分析中',
+  ready: '协作助手已参与',
+  failed: '协作助手暂时断开',
+};
+
+const QUESTION_SOURCE_LABELS: Record<Question['source'], string> = {
+  llm: '协作助手现生成',
+  template: '保底题库模板',
 };
 
 const FLOW_ISSUE_LABELS: Record<string, string> = {
@@ -277,6 +288,10 @@ export function ParentReportPanel({
   flowObserverReason,
   flowObserverIssue,
   learnerProfile,
+  parentSummary,
+  parentSummaryStatus = 'idle',
+  privacyHref,
+  questionSource,
 }: ParentReportPanelProps) {
   const accuracy = attempted === 0 ? 100 : Math.round((correct / attempted) * 100);
   const unlockedSkins = skins.filter((skin) => skin.unlocked);
@@ -340,6 +355,27 @@ export function ParentReportPanel({
           </div>
 
           <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+            <PrivacyNotice href={privacyHref} />
+
+            <section className="space-y-3">
+              <h3 className="text-2xl font-black text-emerald-950">今日摘要</h3>
+              <div className="rounded-3xl bg-white p-4 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-100">
+                {parentSummaryStatus === 'pending' ? (
+                  <p className="text-base font-black leading-relaxed text-child-moss">
+                    小满正在整理今天的学习故事……
+                  </p>
+                ) : parentSummary ? (
+                  <p className="text-base font-black leading-relaxed text-emerald-900">
+                    {parentSummary}
+                  </p>
+                ) : (
+                  <p className="text-base font-black leading-relaxed text-child-moss">
+                    今天的数据还不够多，先继续做几题，我们会把节奏和重点整理给家长。
+                  </p>
+                )}
+              </div>
+            </section>
+
             <section className="grid grid-cols-2 gap-3">
               <div className="rounded-3xl bg-emerald-50 p-4 ring-2 ring-emerald-100">
                 <div className="text-sm font-bold text-emerald-700">答对</div>
@@ -406,7 +442,7 @@ export function ParentReportPanel({
               </section>
             ) : null}
 
-            {flowState || flowAction ? (
+            {flowState || flowAction || flowObserverStatus || questionSource ? (
               <section className="space-y-3">
                 <h3 className="text-2xl font-black text-emerald-950">心流观察</h3>
                 <div className="rounded-3xl bg-white p-4 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-100">
@@ -434,14 +470,19 @@ export function ParentReportPanel({
                     ) : null}
                     <div className="rounded-2xl bg-emerald-50 px-3 py-2 ring-1 ring-emerald-100">
                       <div className="text-sm font-bold text-emerald-700">
-                        大模型观察员
+                        大模型协作助手
                       </div>
                       <div className="text-base font-black text-emerald-950">
                         {flowObserverStatus
                           ? (FLOW_OBSERVER_STATUS_LABELS[flowObserverStatus] ??
                             flowObserverStatus)
-                          : '未配置观察员'}
+                          : '协作助手未接通'}
                       </div>
+                      {questionSource ? (
+                        <div className="mt-1 text-sm font-bold text-emerald-800">
+                          当前出题：{QUESTION_SOURCE_LABELS[questionSource]}
+                        </div>
+                      ) : null}
                       {flowObserverIssue ? (
                         <div className="mt-1 text-sm font-bold text-sky-800">
                           {FLOW_ISSUE_LABELS[flowObserverIssue] ?? flowObserverIssue}
@@ -450,6 +491,21 @@ export function ParentReportPanel({
                       {flowObserverReason ? (
                         <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
                           {flowObserverReason}
+                        </p>
+                      ) : null}
+                      {flowObserverStatus === 'unconfigured' || flowObserverStatus === 'failed' ? (
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
+                          当前先由本地能力模型和保底题库继续陪练，等协作助手恢复后会重新参与出题和摘要。
+                        </p>
+                      ) : null}
+                      {flowObserverStatus === 'ready' && questionSource === 'template' ? (
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
+                          这一题回退到了保底题库，避免在 AI 不稳定时打断孩子的节奏。
+                        </p>
+                      ) : null}
+                      {flowObserverStatus === 'ready' && questionSource === 'llm' ? (
+                        <p className="mt-1 text-sm font-bold leading-relaxed text-emerald-800/80">
+                          这一题由协作助手按当前能力区间现生成，再由安全策略做最后把关。
                         </p>
                       ) : null}
                     </div>

@@ -16,6 +16,7 @@ const baseArgs = {
   initialLevelId: 'sequence-apple',
   onBack: () => undefined,
   onCompleteLevel: () => undefined,
+  onRequestHint: async () => null,
   onSpeak: () => undefined,
   unlockedLevelCount: 1,
 };
@@ -67,6 +68,7 @@ export const Default: Story = {
         initialLevelId="sequence-apple"
         onBack={() => undefined}
         onCompleteLevel={() => undefined}
+        onRequestHint={async () => null}
         onSpeak={() => undefined}
         unlockedLevelCount={1}
       />
@@ -189,6 +191,7 @@ export const ReducedMotion: Story = {
         initialLevelId="sequence-apple"
         onBack={() => undefined}
         onCompleteLevel={() => undefined}
+        onRequestHint={async () => null}
         onSpeak={() => undefined}
         unlockedLevelCount={1}
       />

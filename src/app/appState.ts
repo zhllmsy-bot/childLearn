@@ -1,5 +1,6 @@
 import type { FeedbackLevel } from '../components/FeedbackBadge/FeedbackBadge';
 import type { OptionVisualState } from '../components/OptionButton/OptionButton';
+import { defaultFlowObserverUrl } from '../ai/api/childlearnAi';
 import { DEFAULT_ENGLISH_ITEM } from '../english/englishItems';
 import type { Sticker } from '../engagement/collection/useStickers';
 import { findStickerById } from '../engagement/collection/useStickers';
@@ -83,9 +84,7 @@ export const INTRO_TO_QUESTION_GAP_MS = 240;
 export const QUESTION_ENTRY_DELAY_MS = 520;
 export const QUESTION_IDLE_THRESHOLD_MS = 12000;
 export const RAPID_CLICK_THRESHOLD_MS = 450;
-export const FLOW_OBSERVER_URL = resolveRuntimeUrl(
-  import.meta.env.VITE_FLOW_OBSERVER_URL?.trim(),
-);
+export const FLOW_OBSERVER_URL = defaultFlowObserverUrl();
 
 const configuredFlowObserverTimeoutMs = Number(
   import.meta.env.VITE_FLOW_OBSERVER_TIMEOUT_MS,

@@ -7,6 +7,7 @@ import type {
   LlmLearningObservation,
 } from './types';
 import { parseProfileRefinement } from '../../ai/learnerModel';
+import type { QuestionVariant } from '../../curriculum/types';
 
 const FLOW_STATES = new Set(['easy', 'flow', 'stretch', 'hard', 'fatigue']);
 const OBSERVER_STATES = new Set([...FLOW_STATES, 'unstable']);
@@ -39,6 +40,14 @@ const ADJUSTMENT_DIMENSIONS = new Set([
   'none',
 ]);
 const EVIDENCE_STRENGTHS = new Set(['low', 'medium', 'high']);
+const QUESTION_VARIANTS = new Set([
+  'matching',
+  'compare',
+  'makeTen',
+  'missing',
+  'story',
+  'numberLine',
+]);
 
 export interface ObserveLearningBatchOptions {
   endpoint?: string;
@@ -109,6 +118,7 @@ export function parseLlmLearningObservation(
   const {
     overallState,
     confidence,
+    nextItemSuggestion,
     stateReason,
     primaryIssue,
     recommendation,
@@ -159,6 +169,21 @@ export function parseLlmLearningObservation(
     uxSuggestions: asStringArray(value.uxSuggestions),
     profileRefinement:
       parseProfileRefinement(value.profileRefinement) ?? undefined,
+    nextItemSuggestion:
+      isObject(nextItemSuggestion) &&
+      typeof nextItemSuggestion.targetSkillKey === 'string' &&
+      typeof nextItemSuggestion.reason === 'string' &&
+      typeof nextItemSuggestion.targetTheta === 'number' &&
+      Number.isFinite(nextItemSuggestion.targetTheta) &&
+      typeof nextItemSuggestion.variant === 'string' &&
+      QUESTION_VARIANTS.has(nextItemSuggestion.variant)
+        ? {
+            reason: nextItemSuggestion.reason,
+            targetSkillKey: nextItemSuggestion.targetSkillKey,
+            targetTheta: nextItemSuggestion.targetTheta,
+            variant: nextItemSuggestion.variant as QuestionVariant,
+          }
+        : undefined,
   };
 }
 
@@ -182,7 +207,7 @@ export async function observeLearningBatch(
       },
       body: JSON.stringify({
         schemaVersion: 'childlearn.flow-observer.v1',
-        role: 'learning_observer_not_decider',
+        role: 'learning_co_pilot',
         report,
       }),
       signal: controller.signal,

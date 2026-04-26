@@ -1,4 +1,5 @@
 import type { ProfileRefinement } from '../../ai/learnerModel';
+import type { QuestionVariant } from '../../curriculum/types';
 
 export type FlowState = 'easy' | 'flow' | 'stretch' | 'hard' | 'fatigue';
 
@@ -169,6 +170,12 @@ export interface LlmLearningObservation {
   };
   uxSuggestions: string[];
   profileRefinement?: ProfileRefinement;
+  nextItemSuggestion?: {
+    reason: string;
+    targetSkillKey: string;
+    targetTheta: number;
+    variant: QuestionVariant;
+  };
 }
 
 export interface ApprovedFlowPolicy {

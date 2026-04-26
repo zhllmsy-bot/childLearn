@@ -309,7 +309,7 @@ rule pre-state. It returns only an observation and adjustment recommendation.
 Frontend integration is configured with:
 
 ```text
-VITE_FLOW_OBSERVER_URL=http://127.0.0.1:8791/observe
+VITE_FLOW_OBSERVER_URL=/api/ai?action=observe
 VITE_FLOW_OBSERVER_TIMEOUT_MS=4500
 ```
 
@@ -321,7 +321,7 @@ Request body:
 ```json
 {
   "schemaVersion": "childlearn.flow-observer.v1",
-  "role": "learning_observer_not_decider",
+  "role": "learning_co_pilot",
   "report": "<LearningBatchReport>"
 }
 ```
