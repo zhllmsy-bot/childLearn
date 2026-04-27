@@ -1,6 +1,6 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Flag, Star } from 'lucide-react';
+import { Flag, RotateCcw, Star } from 'lucide-react';
 import type { Question } from '../../curriculum/types';
 import { SPRING } from '../../theme/springs';
 import {
@@ -19,8 +19,10 @@ interface QuestionCardProps {
   reasoningState?: {
     currentStepIndex: number;
     hintText?: string | null;
+    mode: 'multiStep' | 'narration';
     stepStem: string;
     totalSteps: number;
+    title: string;
   } | null;
 }
 
@@ -331,19 +333,120 @@ function BarModelView({ question }: { question: Question }) {
   );
 }
 
-function MakeTenBridgeView({ question }: { question: Question }) {
+function MakeTenBridgeView({
+  question,
+  reasoningState,
+}: {
+  question: Question;
+  reasoningState: QuestionCardProps['reasoningState'];
+}) {
   const [first = 0, second = 0] = question.barModel;
   const bridge = first < 10 ? Math.min(Math.max(10 - first, 0), second) : 0;
-  const leftover = Math.max(second - bridge, 0);
+  const isInteractiveSplit =
+    reasoningState?.mode === 'multiStep' && reasoningState.currentStepIndex === 0;
+  const [movedCount, setMovedCount] = useState(0);
+  const targetRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setMovedCount(0);
+  }, [isInteractiveSplit, question.id, reasoningState?.currentStepIndex]);
+
+  const previewBridge = isInteractiveSplit ? Math.min(movedCount, bridge) : bridge;
+  const leftover = Math.max(second - previewBridge, 0);
+  const dropIntoBridge = (x: number, y: number) => {
+    const bounds = targetRef.current?.getBoundingClientRect();
+    if (!bounds || movedCount >= bridge) {
+      return;
+    }
+
+    if (x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom) {
+      setMovedCount((current) => Math.min(current + 1, bridge));
+    }
+  };
 
   return (
-    <div className="w-full max-w-xl space-y-3 rounded-3xl bg-white/60 p-4 shadow-xl shadow-emerald-500/20 ring-2 ring-white">
+    <div
+      className="w-full max-w-xl space-y-3 rounded-3xl bg-white/60 p-4 shadow-xl shadow-emerald-500/20 ring-2 ring-white"
+      data-testid="make-ten-bridge"
+    >
       <SegmentedBar label="先有" count={first} max={10} tone="emerald" showTicks />
-      <SegmentedBar label="再来" count={second} max={10} tone="amber" />
+      <div className="grid gap-3 md:grid-cols-[1.15fr,0.85fr]">
+        <div
+          ref={targetRef}
+          className="rounded-3xl bg-white/75 p-3 shadow-inner shadow-emerald-900/5 ring-2 ring-white"
+          data-testid="make-ten-bridge-target"
+        >
+          <div className="mb-2 flex items-center justify-between gap-3 text-sm font-black text-emerald-900/70 md:text-base">
+            <span>把橙色拖过来，先把它凑到 10</span>
+            {isInteractiveSplit ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-sm font-black text-emerald-900 shadow-sm ring-1 ring-emerald-100"
+                onClick={() => setMovedCount(0)}
+                data-testid="make-ten-bridge-reset"
+              >
+                <RotateCcw size={14} strokeWidth={2.8} />
+                重来
+              </button>
+            ) : null}
+          </div>
+          <SegmentedCells
+            max={10}
+            tones={Array.from({ length: 10 }, (_, index) => {
+              if (index < first) {
+                return 'emerald' as const;
+              }
+              if (index < first + previewBridge) {
+                return 'amber' as const;
+              }
+              return 'empty' as const;
+            })}
+          />
+          <TickRow max={10} />
+        </div>
+        <div className="rounded-3xl bg-amber-50/90 p-3 shadow-lg shadow-amber-400/10 ring-2 ring-white">
+          <div className="mb-2 text-left text-sm font-black text-amber-900/75 md:text-base">
+            剩下的小果子
+          </div>
+          <div className="flex min-h-28 flex-wrap justify-center gap-2">
+            {Array.from({ length: Math.max(leftover, 0) }, (_, index) => (
+              <motion.button
+                key={`${question.id}-leftover-${index}`}
+                type="button"
+                drag={isInteractiveSplit}
+                dragSnapToOrigin
+                dragMomentum={false}
+                whileTap={{ scale: 0.94 }}
+                whileHover={isInteractiveSplit ? { scale: 1.06, y: -4 } : undefined}
+                onClick={() => {
+                  if (!isInteractiveSplit) {
+                    return;
+                  }
+                  setMovedCount((current) => Math.min(current + 1, bridge));
+                }}
+                onDragEnd={(_, info) => dropIntoBridge(info.point.x, info.point.y)}
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-orange-400 shadow-lg shadow-amber-300/40 ring-2 ring-white md:h-12 md:w-12"
+                aria-label="拖动或轻点小果子去凑十"
+                data-testid="make-ten-leftover-token"
+              />
+            ))}
+          </div>
+          <p
+            className="mt-3 rounded-2xl bg-white/72 px-3 py-2 text-sm font-black leading-snug text-amber-900 shadow-sm ring-1 ring-white/90"
+            data-testid="make-ten-bridge-status"
+          >
+            {isInteractiveSplit
+              ? previewBridge >= bridge
+                ? `刚好凑到 10 啦，还剩 ${leftover} 个。`
+                : `先试试看，要拖几个过去才刚刚好？`
+              : `先用 ${bridge} 个把它凑到 10，再剩下 ${leftover} 个。`}
+          </p>
+        </div>
+      </div>
       <div className="grid gap-2 md:grid-cols-2">
         <div className="rounded-2xl bg-emerald-50/90 px-4 py-3 text-left shadow-lg shadow-emerald-500/10 ring-2 ring-white">
           <div className="text-sm font-black text-emerald-900/65">先凑到 10</div>
-          <div className="mt-1 text-2xl font-black text-emerald-950">{bridge}</div>
+          <div className="mt-1 text-2xl font-black text-emerald-950">{previewBridge}</div>
         </div>
         <div className="rounded-2xl bg-amber-50/90 px-4 py-3 text-left shadow-lg shadow-amber-500/10 ring-2 ring-white">
           <div className="text-sm font-black text-amber-900/70">还剩下</div>
@@ -388,7 +491,11 @@ function NumberLineView({ question }: { question: Question }) {
 
 function LearningRepresentation({ question }: { question: Question }) {
   if (question.reasoning?.kind === 'multiStep' && question.reasoning.strategy === 'makeTen') {
-    return <MakeTenBridgeView question={question} />;
+    return <MakeTenBridgeView question={question} reasoningState={null} />;
+  }
+
+  if (question.reasoning?.kind === 'narration' && question.reasoning.strategy === 'makeTen') {
+    return <MakeTenBridgeView question={question} reasoningState={null} />;
   }
 
   if (question.variant === 'numberLine') {
@@ -422,11 +529,16 @@ function ReasoningPanel({
   reasoningState: NonNullable<QuestionCardProps['reasoningState']>;
 }) {
   return (
-    <div className="w-full max-w-3xl rounded-3xl bg-white/72 p-4 text-left shadow-xl shadow-amber-500/10 ring-2 ring-white md:p-5">
+    <div
+      className="w-full max-w-3xl rounded-3xl bg-white/72 p-4 text-left shadow-xl shadow-amber-500/10 ring-2 ring-white md:p-5"
+      data-testid="reasoning-panel"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 text-base font-black text-emerald-950/70 md:text-lg">
-        <span>凑十小步骤</span>
+        <span>{reasoningState.title}</span>
         <span>
-          {reasoningState.currentStepIndex + 1}/{reasoningState.totalSteps}
+          {reasoningState.mode === 'multiStep'
+            ? `${reasoningState.currentStepIndex + 1}/${reasoningState.totalSteps}`
+            : '说一说'}
         </span>
       </div>
       <div
@@ -486,7 +598,11 @@ function QuestionCardComponent({ question, answered, reasoningState = null }: Qu
           <Badge>{VARIANT_LABEL[question.variant]}</Badge>
         </div>
 
-        <LearningRepresentation question={question} />
+        {question.reasoning?.strategy === 'makeTen' ? (
+          <MakeTenBridgeView question={question} reasoningState={reasoningState} />
+        ) : (
+          <LearningRepresentation question={question} />
+        )}
 
         <motion.h1
           key={question.expression}

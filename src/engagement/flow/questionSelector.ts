@@ -127,10 +127,12 @@ function learnerPlanAdjustment({
   baselineDifficulty,
   lane,
   learnerProfile,
+  serial,
 }: {
   baselineDifficulty: number;
   lane: FlowQuestionLane;
   learnerProfile?: LearnerProfile | null;
+  serial: number;
 }) {
   const targetSkillKey = chooseLearnerTargetSkill(learnerProfile, lane);
   if (!targetSkillKey || !learnerProfile) {
@@ -160,6 +162,14 @@ function learnerPlanAdjustment({
 
     if (makeTenReady && !crossTenReady) {
       reasoningMode = 'multiStep';
+    } else if (
+      crossTenReady &&
+      lane !== 'confidence' &&
+      lane !== 'review' &&
+      serial > 0 &&
+      serial % 5 === 0
+    ) {
+      reasoningMode = 'narration';
     } else {
       reasoningMode = 'direct';
     }
@@ -188,6 +198,7 @@ export function buildFlowQuestionPlanForLane({
     baselineDifficulty,
     lane,
     learnerProfile,
+    serial,
   });
   const difficulty = learnerAdjustment.difficulty;
   const plan: FlowQuestionPlan = {

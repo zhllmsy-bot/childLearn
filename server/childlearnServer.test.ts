@@ -43,6 +43,24 @@ describe('childlearnServer', () => {
     });
   });
 
+  it('gracefully degrades cross-ten hint generation when AI is unconfigured', async () => {
+    const result = await executeAiAction('cross-ten-hint', {
+      expression: '6 + 7 = ?',
+      prompt: '先把它凑到10吧。',
+      reasoningMode: 'multiStep',
+      stepStem: '7 可以拆成几和几，让 6 先到 10？',
+      wrongChoice: '5 和 2',
+    });
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        hint: null,
+        reason: 'ai_unconfigured',
+      },
+    });
+  });
+
   it('gracefully degrades story polish when AI is unconfigured', async () => {
     const result = await executeAiAction('story-polish', {
       answer: 7,
@@ -256,6 +274,138 @@ describe('childlearnServer', () => {
             strategy: 'makeTen',
           },
         },
+      },
+    });
+  });
+
+  it('accepts validated cross-ten narration payloads with multiple good answers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  confidence: 0.79,
+                  question: {
+                    variant: 'makeTen',
+                    level: 4,
+                    factId: 'llm-cross-ten-narration',
+                    prompt: '8 + 5 算完了，你是怎么想的？',
+                    expression: '8 + 5 = 13',
+                    answer: 1,
+                    options: [
+                      { label: '把 5 拆成 2 和 3，8 + 2 先到 10', value: 1 },
+                      { label: '从 8 接着数 5 下，也能到 13', value: 2 },
+                      { label: '从 1 开始一直数到 13', value: 3 },
+                      { label: '我只是随便猜的', value: 4 },
+                    ],
+                    objects: ['🍓', '🍓', '🍓', '🍓', '🍓', '🍓', '🍓', '🍓', '🍓', '🍓', '🍓', '🍓', '🍓'],
+                    barModel: [8, 5],
+                    scaffoldText: '想一想，是不是先把 8 凑到 10。',
+                    principleText: '会说出自己的想法，就更会算了。',
+                    estimatedTheta: 1.62,
+                    theme: {
+                      emoji: '🍓',
+                      colorHint: 'pink',
+                    },
+                    reasoning: {
+                      kind: 'narration',
+                      strategy: 'makeTen',
+                      narrative: '把 5 拆成 2 和 3，8 加 2 先到 10，再加 3。',
+                      acceptedOptionValues: [1, 2],
+                    },
+                  },
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await executeAiAction(
+      'cross-ten-question',
+      {
+        difficulty: 6,
+        lane: 'challenge',
+        serial: 5,
+        target: {
+          skillKey: 'crossTenBridge',
+          targetTheta: 1.6,
+        },
+        constraints: {
+          variant: 'makeTen',
+          reasoningMode: 'narration',
+        },
+      },
+      {
+        env: {
+          CHILDLEARN_AI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        confidence: 0.79,
+        estimatedTheta: 1.62,
+        question: {
+          expression: '8 + 5 = 13',
+          reasoning: {
+            kind: 'narration',
+            strategy: 'makeTen',
+            acceptedOptionValues: [1, 2],
+          },
+        },
+      },
+    });
+  });
+
+  it('accepts validated cross-ten hints', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  hint: '6 还差 4 才到 10 哦。',
+                }),
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await executeAiAction(
+      'cross-ten-hint',
+      {
+        expression: '6 + 7 = ?',
+        prompt: '先把它凑到10吧。',
+        reasoningMode: 'multiStep',
+        stepStem: '7 可以拆成几和几，让 6 先到 10？',
+        wrongChoice: '5 和 2',
+        correctChoice: '4 和 3',
+        targetNarrative: '把 7 拆成 4 和 3，6 加 4 先到 10。',
+      },
+      {
+        env: {
+          CHILDLEARN_AI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        hint: '6 还差 4 才到 10 哦。',
       },
     });
   });

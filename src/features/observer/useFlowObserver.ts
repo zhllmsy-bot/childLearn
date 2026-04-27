@@ -363,7 +363,10 @@ export function useFlowObserver({
       targetTheta: plan.targetTheta,
       variant: effectiveVariant,
     });
-    if (plan.targetSkillKey === 'crossTenBridge' && plan.reasoningMode === 'multiStep') {
+    if (
+      plan.targetSkillKey === 'crossTenBridge' &&
+      (plan.reasoningMode === 'multiStep' || plan.reasoningMode === 'narration')
+    ) {
       const crossTenResult = await requestCrossTenQuestion(coPilotPayload);
       if (crossTenResult) {
         const fingerprint = questionFingerprint(crossTenResult.question);

@@ -211,6 +211,19 @@ export function buildCorrectVoiceLine({
     };
   }
 
+  if (
+    question.reasoning?.kind === 'multiStep' &&
+    question.reasoning.narrative &&
+    question.reasoning.strategy === 'makeTen'
+  ) {
+    return {
+      moment: 'correct',
+      rate: REWARD_RATE,
+      voice: GENTLE_VOICE,
+      text: compact(`对啦。${question.reasoning.narrative} 你刚才想得很清楚。`),
+    };
+  }
+
   if (level === 'amazing') {
     return {
       moment: 'correct',

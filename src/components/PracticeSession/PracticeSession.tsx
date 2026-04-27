@@ -14,8 +14,10 @@ interface PracticeSessionProps {
   reasoningState?: {
     currentStepIndex: number;
     hintText?: string | null;
+    mode: 'multiStep' | 'narration';
     stepStem: string;
     totalSteps: number;
+    title: string;
   } | null;
   levelProgress: number;
   levelQuestionGoal: number;

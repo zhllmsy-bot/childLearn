@@ -193,4 +193,38 @@ describe('selectFlowQuestionPlan', () => {
     expect(plan.reasoningMode).toBe('multiStep');
     expect(plan.variant).toBe('makeTen');
   });
+
+  it('inserts narration-mode cross-ten questions after the bridge is stable', () => {
+    const baseProfile = createEmptyLearnerProfile();
+    const learnerProfile = {
+      ...baseProfile,
+      recommendedSkill: 'crossTenBridge' as const,
+      skills: {
+        ...baseProfile.skills,
+        makeTen: {
+          ...baseProfile.skills.makeTen,
+          theta: 1.1,
+          confidence: 0.82,
+          attempts: 8,
+        },
+        crossTenBridge: {
+          ...baseProfile.skills.crossTenBridge,
+          theta: 0.95,
+          confidence: 0.78,
+          attempts: 7,
+        },
+      },
+    };
+
+    const plan = selectFlowQuestionPlan({
+      learnerProfile,
+      policy: BASE_POLICY,
+      fallbackDifficulty: 5,
+      serial: 5,
+    });
+
+    expect(plan.targetSkillKey).toBe('crossTenBridge');
+    expect(plan.reasoningMode).toBe('narration');
+    expect(plan.variant).toBe('makeTen');
+  });
 });

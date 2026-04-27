@@ -71,6 +71,12 @@ export interface AdaptiveQuestionPayload {
     skillKeys: string[];
     thetaAtTime: number;
     errorPattern?: QuestionErrorPattern | null;
+    strategyUse?: {
+      attemptedStrategy: string;
+      narrationChoice?: string;
+      stepsCorrect: boolean[];
+      totalSteps: number;
+    };
   }>;
   recentFingerprints: string[];
   constraints: {
@@ -223,6 +229,14 @@ function buildRecentQuestions(
       skillKeys: skillKeysForQuestion(record),
       thetaAtTime: difficultyThetaForTags(record.tags),
       errorPattern: classifyError(record),
+      strategyUse: record.strategyUse
+        ? {
+            attemptedStrategy: record.strategyUse.attemptedStrategy,
+            narrationChoice: record.strategyUse.narrationChoice,
+            stepsCorrect: record.strategyUse.stepsCorrect,
+            totalSteps: record.strategyUse.totalSteps,
+          }
+        : undefined,
     }));
   }
 
@@ -237,6 +251,7 @@ function buildRecentQuestions(
     skillKeys: response.skillKeys,
     thetaAtTime: response.difficultyTheta,
     errorPattern: null,
+    strategyUse: undefined,
   }));
 }
 

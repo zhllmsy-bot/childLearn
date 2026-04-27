@@ -18,6 +18,7 @@ import {
 import { useLearnerProfile } from './ai/useLearnerProfile';
 import {
   requestColdStartBaselineAssessment,
+  requestCrossTenHint,
   requestProgrammingHint,
 } from './ai/api/childlearnAi';
 import {
@@ -365,6 +366,51 @@ function AppRootContent() {
   const activeAnswerOptions = activeReasoningStep?.choices ?? question.options;
   const activeAnswerValue =
     activeReasoningStep?.choices[activeReasoningStep.correctIndex]?.value ?? question.answer;
+  const acceptedNarrationValues = useMemo(
+    () =>
+      question.reasoning?.kind === 'narration'
+        ? question.reasoning.acceptedOptionValues ?? [question.answer]
+        : [question.answer],
+    [question.answer, question.reasoning],
+  );
+  const displayAnswerValue = useMemo(() => {
+    if (question.reasoning?.kind !== 'narration' || !answered || !selectedOptionId) {
+      return activeAnswerValue;
+    }
+
+    const selectedAccepted = activeAnswerOptions.find(
+      (candidate) =>
+        candidate.id === selectedOptionId && acceptedNarrationValues.includes(candidate.value),
+    );
+    return selectedAccepted?.value ?? activeAnswerValue;
+  }, [
+    acceptedNarrationValues,
+    activeAnswerOptions,
+    activeAnswerValue,
+    answered,
+    question.reasoning?.kind,
+    selectedOptionId,
+  ]);
+
+  const narrationStrategyForOption = useCallback((label: string) => {
+    if (label.includes('从1') || label.includes('一个一个')) {
+      return 'countAll' as const;
+    }
+
+    if (label.includes('接着数') || label.includes('往后数')) {
+      return 'countOn' as const;
+    }
+
+    if (label.includes('凑成10') || label.includes('凑到10') || label.includes('拆成')) {
+      return 'makeTen' as const;
+    }
+
+    if (label.includes('双双') || label.includes('一对')) {
+      return 'doubles' as const;
+    }
+
+    return 'direct' as const;
+  }, []);
 
   useEffect(() => {
     reviewQueueRef.current = reviewQueue;
@@ -1032,9 +1078,12 @@ function AppRootContent() {
           currentReasoningCorrectOption &&
           question.reasoning?.kind === 'multiStep',
       );
+      const isNarrationQuestion = question.reasoning?.kind === 'narration';
       const isCorrect = isMultiStepQuestion
         ? option.id === currentReasoningCorrectOption?.id
-        : option.value === question.answer;
+        : isNarrationQuestion
+          ? acceptedNarrationValues.includes(option.value)
+          : option.value === question.answer;
       const isDiagnosticRun = currentRunModeRef.current === 'diagnostic';
       const nextHintStage = isCorrect ? hintStage : Math.min(hintStage + 1, 3);
       const attemptTelemetry = recordAnswerAttempt(question, option, nextHintStage);
@@ -1069,14 +1118,12 @@ function AppRootContent() {
             dda.onWrong(deriveQuestionDifficultyTags(question));
           }
           const nextLevelMistakes = levelMistakes + 1;
-          const promptLine =
-            currentReasoningStep.hintOnWrong
-              ? buildProgrammingVoiceLine(currentReasoningStep.hintOnWrong)
-              : buildHintVoiceLine(question, nextHintStage);
+          const fallbackHintText =
+            currentReasoningStep.hintOnWrong ?? question.scaffoldText;
           pendingAttemptRecordOverrideRef.current = null;
           setLevelMistakes(nextLevelMistakes);
           setHintStage(nextHintStage);
-          setReasoningVisibleHint(currentReasoningStep.hintOnWrong ?? null);
+          setReasoningVisibleHint(fallbackHintText);
           setFeedback('wrong');
           setReviewQueue((queue) => {
             const nextQueue = addReviewItem(queue, question);
@@ -1093,19 +1140,38 @@ function AppRootContent() {
               reasoningStepLabel: currentReasoningStep.stepId,
             }),
           );
-          void speak(promptLine);
-          const feedbackDelay = Math.max(
-            WRONG_FEEDBACK_MIN_MS,
-            estimateVoiceLineDurationMs(promptLine),
-          );
-          void waitFor(feedbackDelay).then(() => {
+          void (async () => {
+            const dynamicHint =
+              (await requestCrossTenHint({
+                expression: question.expression,
+                prompt: question.prompt,
+                reasoningMode: 'multiStep',
+                stepStem: currentReasoningStep.stem,
+                wrongChoice: option.label,
+                correctChoice: currentReasoningCorrectOption.label,
+                targetNarrative: question.reasoning?.narrative,
+                hintOnWrong: currentReasoningStep.hintOnWrong,
+              })) ?? fallbackHintText;
             if (!isCurrentFlow(flowId)) {
               return;
             }
 
-            setSelectedOptionId(null);
-            setFeedback(null);
-          });
+            setReasoningVisibleHint(dynamicHint);
+            const promptLine = buildProgrammingVoiceLine(dynamicHint);
+            void speak(promptLine);
+            const feedbackDelay = Math.max(
+              WRONG_FEEDBACK_MIN_MS,
+              estimateVoiceLineDurationMs(promptLine),
+            );
+            void waitFor(feedbackDelay).then(() => {
+              if (!isCurrentFlow(flowId)) {
+                return;
+              }
+
+              setSelectedOptionId(null);
+              setFeedback(null);
+            });
+          })();
           return;
         }
 
@@ -1149,6 +1215,19 @@ function AppRootContent() {
           },
         };
         setReasoningVisibleHint(null);
+      }
+
+      if (isNarrationQuestion) {
+        pendingAttemptRecordOverrideRef.current = {
+          finalCorrect: isCorrect,
+          strategyUse: {
+            attemptedStrategy: narrationStrategyForOption(option.label),
+            stepsCorrect: [],
+            totalSteps: 0,
+            narrationChoice: option.label,
+          },
+        };
+        setReasoningVisibleHint(isCorrect ? null : question.reasoning?.narrative ?? question.principleText);
       }
 
       if (!isDiagnosticRun) {
@@ -1592,7 +1671,7 @@ function AppRootContent() {
           option,
           question: {
             ...question,
-            answer: activeAnswerValue,
+            answer: displayAnswerValue,
             options: activeAnswerOptions,
           },
           selectedOptionId,
@@ -1600,19 +1679,42 @@ function AppRootContent() {
           hintStage,
         }),
       })),
-    [activeAnswerOptions, activeAnswerValue, answered, hintStage, question, selectedOptionId],
+    [activeAnswerOptions, answered, displayAnswerValue, hintStage, question, selectedOptionId],
   );
   const practiceReasoningState = useMemo(
-    () =>
-      activeReasoningStep
-        ? {
-            currentStepIndex: reasoningStepIndex,
-            hintText: reasoningVisibleHint,
-            stepStem: activeReasoningStep.stem,
-            totalSteps: reasoningSteps.length,
-          }
-        : null,
-    [activeReasoningStep, reasoningStepIndex, reasoningSteps.length, reasoningVisibleHint],
+    () => {
+      if (activeReasoningStep) {
+        return {
+          currentStepIndex: reasoningStepIndex,
+          hintText: reasoningVisibleHint,
+          mode: 'multiStep' as const,
+          stepStem: activeReasoningStep.stem,
+          totalSteps: reasoningSteps.length,
+          title: '凑十小步骤',
+        };
+      }
+
+      if (question.reasoning?.kind === 'narration') {
+        return {
+          currentStepIndex: 0,
+          hintText: reasoningVisibleHint,
+          mode: 'narration' as const,
+          stepStem: question.prompt,
+          totalSteps: 1,
+          title: '说说你是怎么想的',
+        };
+      }
+
+      return null;
+    },
+    [
+      activeReasoningStep,
+      question.prompt,
+      question.reasoning?.kind,
+      reasoningStepIndex,
+      reasoningSteps.length,
+      reasoningVisibleHint,
+    ],
   );
   const homeSceneProps = useMemo(
     () => ({

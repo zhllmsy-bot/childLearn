@@ -29,7 +29,12 @@ export interface QuestionTheme {
 
 export type QuestionReasoningKind = 'single' | 'multiStep' | 'narration';
 
-export type QuestionReasoningStrategy = 'makeTen' | 'doubles' | 'countOn' | 'direct';
+export type QuestionReasoningStrategy =
+  | 'makeTen'
+  | 'doubles'
+  | 'countOn'
+  | 'countAll'
+  | 'direct';
 
 export interface QuestionReasoningStep {
   stepId: string;
@@ -45,6 +50,7 @@ export interface QuestionReasoning {
   strategy: QuestionReasoningStrategy;
   steps?: QuestionReasoningStep[];
   narrative?: string;
+  acceptedOptionValues?: number[];
 }
 
 export interface Question {

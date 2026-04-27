@@ -21,6 +21,7 @@ type JsonRecord = Record<string, unknown>;
 export type AiAction =
   | 'observe'
   | 'question'
+  | 'cross-ten-hint'
   | 'cross-ten-question'
   | 'cold-start-probe'
   | 'cold-start-assess'
@@ -84,6 +85,12 @@ interface QuestionRequestBody {
     reactionTimeMs?: number;
     skillKeys?: string[];
     stem?: string;
+    strategyUse?: {
+      attemptedStrategy?: string;
+      narrationChoice?: string;
+      stepsCorrect?: boolean[];
+      totalSteps?: number;
+    };
     thetaAtTime?: number;
   }>;
   skillRadar?: Array<{
@@ -119,6 +126,17 @@ interface QuestionRequestBody {
     questionId?: string;
     skillKeys?: string[];
   }>;
+}
+
+interface CrossTenHintRequestBody {
+  correctChoice?: string;
+  expression?: string;
+  hintOnWrong?: string;
+  prompt?: string;
+  reasoningMode?: 'multiStep' | 'narration';
+  stepStem?: string;
+  targetNarrative?: string;
+  wrongChoice?: string;
 }
 
 interface ColdStartProbeRequestBody {
@@ -197,6 +215,7 @@ const DEFAULT_THEME_BY_VARIANT: Record<QuestionVariant, QuestionTheme> = {
 };
 
 const QUESTION_ACTION = '/api/ai?action=question';
+const CROSS_TEN_HINT_ACTION = '/api/ai?action=cross-ten-hint';
 const CROSS_TEN_QUESTION_ACTION = '/api/ai?action=cross-ten-question';
 const COLD_START_PROBE_ACTION = '/api/ai?action=cold-start-probe';
 const COLD_START_ASSESS_ACTION = '/api/ai?action=cold-start-assess';
@@ -311,6 +330,7 @@ function getCached(action: AiAction, body: unknown) {
 function setCached(action: AiAction, body: unknown, responseBody: unknown) {
   const ttlMs =
     action === 'question' ||
+    action === 'cross-ten-hint' ||
     action === 'cross-ten-question' ||
     action === 'story-polish' ||
     action === 'cold-start-probe' ||
@@ -610,23 +630,35 @@ const CROSS_TEN_SYSTEM_PROMPT = `You generate one preschool-friendly Chinese mak
 Goal:
 - Teach the thinking path for crossing 10, not just the final answer.
 - Prefer questions like 6+7, 8+5, 9+4.
-- Use a three-step "split -> make 10 -> combine" flow.
+- Read constraints.reasoningMode:
+  - "multiStep" => generate a three-step "split -> make 10 -> combine" flow.
+  - "narration" => generate a "你是怎么算的" strategy question about a solved cross-ten fact.
+  - otherwise => default to "multiStep".
 
 Rules:
 - Output exactly one JSON object.
 - Use simple Chinese only. Keep every sentence short, warm, and child-safe.
 - The whole question should target crossTenBridge and stay near target.targetTheta.
-- Return exactly 4 numeric answer options for the final answer, and 4 short options for step 1.
-- The top-level question answer must be the final total.
+- Return exactly 4 answer options.
 - Order the expression so the first addend is the one being brought to 10 and the second addend is the one being split.
-- reasoning.kind must be "multiStep".
-- reasoning.strategy must be "makeTen".
-- reasoning.steps must contain exactly 3 steps:
-  1. decomposition: choose how to split one addend so the other reaches 10
-  2. make ten: compute the bridge to 10
-  3. combine: compute 10 + the leftover
-- Step 1 choices should use short labels like "4 和 3" and numeric values equal to the part used to make 10.
-- Include one friendly hintOnWrong for each step.
+- If reasoningMode is "multiStep":
+  - The top-level question answer must be the final total.
+  - reasoning.kind must be "multiStep".
+  - reasoning.strategy must be "makeTen".
+  - reasoning.steps must contain exactly 3 steps:
+    1. decomposition: choose how to split one addend so the other reaches 10
+    2. make ten: compute the bridge to 10
+    3. combine: compute 10 + the leftover
+  - Step 1 choices should use short labels like "4 和 3" and numeric values equal to the part used to make 10.
+  - Include one friendly hintOnWrong for each step.
+- If reasoningMode is "narration":
+  - reasoning.kind must be "narration".
+  - reasoning.strategy should reflect the target good strategy, usually "makeTen".
+  - The prompt should ask how the child thought about the solved fact.
+  - options should be short strategy descriptions such as "把5拆成2和3", "从8接着数", "从1开始数", "一下就知道".
+  - answer should be the value of one accepted correct option.
+  - reasoning.acceptedOptionValues may include more than one acceptable strategy value.
+  - Include reasoning.narrative with the target explanation sentence.
 - Keep stem structures fresh and avoid recent fingerprints when possible.
 
 Return JSON:
@@ -647,9 +679,10 @@ Return JSON:
     "principleText": string,
     "estimatedTheta": number,
     "reasoning": {
-      "kind": "multiStep",
-      "strategy": "makeTen",
+      "kind": "multiStep" | "narration",
+      "strategy": "makeTen" | "countOn" | "countAll" | "direct",
       "narrative": string,
+      "acceptedOptionValues": [number],
       "steps": [
         {
           "stepId": "split",
@@ -688,8 +721,29 @@ Return JSON:
 Constraints:
 - barModel should contain the two original addends
 - objects should stay at or below 20
-- final answer options should include one off-by-one distractor
-- step 1 should expose the needed bridge part clearly`;
+- For multiStep, final answer options should include one off-by-one distractor
+- For multiStep, step 1 should expose the needed bridge part clearly
+- For narration, at least one wrong option should reflect countAll or countOn when makeTen is the target`;
+
+const CROSS_TEN_HINT_SYSTEM_PROMPT = `You explain one cross-ten thinking mistake to a 4-6 year old Chinese learner.
+
+You receive:
+- expression and prompt
+- reasoningMode
+- current step stem if available
+- the child's wrong choice
+- the correct choice if available
+- a target narrative for the good strategy
+- a fallback hint
+
+Rules:
+- Return exactly one JSON object: { "hint": string }.
+- Use simple Chinese only.
+- Max 30 Chinese characters.
+- Be warm and concrete, never scolding.
+- Name the key gap directly, such as "还差几到10" or "是从8接着数".
+- Prefer the supplied targetNarrative or correctChoice when they help.
+- If the payload is thin, slightly polish hintOnWrong instead of inventing new facts.`;
 
 const COLD_START_PROBE_SYSTEM_PROMPT = `You are assessing a 4-6 year old Chinese learner's math starting point in exactly 5 probe questions.
 
@@ -877,9 +931,22 @@ function parseReasoningStrategy(value: unknown): QuestionReasoning['strategy'] |
   return value === 'makeTen' ||
     value === 'doubles' ||
     value === 'countOn' ||
+    value === 'countAll' ||
     value === 'direct'
     ? value
     : null;
+}
+
+function normalizeAcceptedOptionValues(value: unknown): number[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const accepted = value
+    .map((item) => Math.round(Number(item)))
+    .filter((item) => Number.isFinite(item));
+
+  return accepted.length > 0 ? [...new Set(accepted)].slice(0, 4) : undefined;
 }
 
 function normalizeStepChoices(rawChoices: unknown): QuestionOption[] | null {
@@ -949,6 +1016,7 @@ function normalizeQuestionReasoning(payload: unknown): QuestionReasoning | undef
       kind,
       strategy,
       narrative,
+      acceptedOptionValues: normalizeAcceptedOptionValues(payload.acceptedOptionValues),
     };
   }
 
@@ -1278,6 +1346,23 @@ function buildQuestionPromptBody(body: QuestionRequestBody) {
               ),
               skillKeys: sanitizeStringArray(question.skillKeys, 6, 48),
               stem: compactOptionalText(question.stem, 80) ?? '',
+              strategyUse: isRecord(question.strategyUse)
+                ? {
+                    attemptedStrategy:
+                      compactOptionalText(question.strategyUse.attemptedStrategy, 24) ?? '',
+                    narrationChoice:
+                      compactOptionalText(question.strategyUse.narrationChoice, 40) ?? '',
+                    stepsCorrect: Array.isArray(question.strategyUse.stepsCorrect)
+                      ? question.strategyUse.stepsCorrect
+                          .slice(0, 4)
+                          .map((value) => Boolean(value))
+                      : [],
+                    totalSteps: Math.max(
+                      0,
+                      Math.round(finiteNumber(question.strategyUse.totalSteps) ?? 0),
+                    ),
+                  }
+                : undefined,
               thetaAtTime: clamp(finiteNumber(question.thetaAtTime) ?? 0, -2, 2.5),
             },
           ];
@@ -1317,6 +1402,20 @@ function buildQuestionPromptBody(body: QuestionRequestBody) {
     rangeHint: band.quantityRange,
     totalRangeHint: band.totalRange,
     levelHint: band.level,
+  };
+}
+
+function buildCrossTenHintPromptBody(body: CrossTenHintRequestBody) {
+  return {
+    expression: compactOptionalText(body.expression, 40) ?? '',
+    prompt: compactOptionalText(body.prompt, 60) ?? '',
+    reasoningMode:
+      body.reasoningMode === 'narration' ? 'narration' : 'multiStep',
+    stepStem: compactOptionalText(body.stepStem, 60) ?? '',
+    wrongChoice: compactOptionalText(body.wrongChoice, 40) ?? '',
+    correctChoice: compactOptionalText(body.correctChoice, 40) ?? '',
+    targetNarrative: compactOptionalText(body.targetNarrative, 80) ?? '',
+    hintOnWrong: compactOptionalText(body.hintOnWrong, 60) ?? '',
   };
 }
 
@@ -1451,6 +1550,40 @@ async function handleQuestionAction(
   };
 }
 
+async function handleCrossTenHintAction(
+  body: CrossTenHintRequestBody,
+  context: ServerExecutionContext,
+): Promise<ServerResult> {
+  const cached = getCached('cross-ten-hint', body);
+  if (cached) {
+    return { status: 200, body: cached };
+  }
+
+  const payload = await requestStructuredJson(
+    context,
+    'cross-ten-hint',
+    CROSS_TEN_HINT_SYSTEM_PROMPT,
+    buildCrossTenHintPromptBody(body),
+  );
+  const hint =
+    isRecord(payload) && typeof payload.hint === 'string'
+      ? compactText(payload.hint).slice(0, 36)
+      : null;
+  if (!hint) {
+    return {
+      status: 502,
+      body: { error: 'invalid_cross_ten_hint_payload' },
+    };
+  }
+
+  const responseBody = { hint };
+  setCached('cross-ten-hint', body, responseBody);
+  return {
+    status: 200,
+    body: responseBody,
+  };
+}
+
 async function handleCrossTenQuestionAction(
   body: QuestionRequestBody,
   context: ServerExecutionContext,
@@ -1468,7 +1601,13 @@ async function handleCrossTenQuestionAction(
   );
   const candidate = extractQuestionCandidate(payload);
   const question = normalizeQuestionPayload(candidate.questionPayload, body);
-  if (!question?.reasoning || question.reasoning.kind !== 'multiStep') {
+  const expectedMode = body.constraints?.reasoningMode ?? 'multiStep';
+  if (
+    !question?.reasoning ||
+    (expectedMode === 'narration'
+      ? question.reasoning.kind !== 'narration'
+      : question.reasoning.kind !== 'multiStep')
+  ) {
     return {
       status: 502,
       body: { error: 'invalid_cross_ten_payload' },
@@ -1704,6 +1843,10 @@ export async function executeAiAction(
       return await handleQuestionAction((body ?? {}) as QuestionRequestBody, context);
     }
 
+    if (action === 'cross-ten-hint') {
+      return await handleCrossTenHintAction((body ?? {}) as CrossTenHintRequestBody, context);
+    }
+
     if (action === 'cross-ten-question') {
       return await handleCrossTenQuestionAction((body ?? {}) as QuestionRequestBody, context);
     }
@@ -1756,6 +1899,8 @@ export async function executeAiAction(
             ? { observation: null, reason: 'ai_unconfigured' }
             : action === 'question'
               ? { question: null, reason: 'ai_unconfigured' }
+              : action === 'cross-ten-hint'
+                ? { hint: null, reason: 'ai_unconfigured' }
               : action === 'cross-ten-question'
                 ? { question: null, confidence: 0, estimatedTheta: null, reason: 'ai_unconfigured' }
               : action === 'cold-start-probe'
@@ -1897,6 +2042,7 @@ export async function proxyTelemetry(
 export const DEFAULT_AI_ACTIONS = {
   coldStartAssess: COLD_START_ASSESS_ACTION,
   coldStartProbe: COLD_START_PROBE_ACTION,
+  crossTenHint: CROSS_TEN_HINT_ACTION,
   crossTenQuestion: CROSS_TEN_QUESTION_ACTION,
   observe: OBSERVE_ACTION,
   parentSummary: PARENT_SUMMARY_ACTION,

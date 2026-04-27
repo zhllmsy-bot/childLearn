@@ -21,6 +21,7 @@ const DEFAULT_AI_ACTIONS = {
   parentSummary: '/api/ai?action=parent-summary',
   programmingHint: '/api/ai?action=programming-hint',
   question: '/api/ai?action=question',
+  crossTenHint: '/api/ai?action=cross-ten-hint',
   crossTenQuestion: '/api/ai?action=cross-ten-question',
   coldStartProbe: '/api/ai?action=cold-start-probe',
   coldStartAssess: '/api/ai?action=cold-start-assess',
@@ -32,6 +33,7 @@ const AI_ACTION_QUERY_NAMES = {
   parentSummary: 'parent-summary',
   programmingHint: 'programming-hint',
   question: 'question',
+  crossTenHint: 'cross-ten-hint',
   crossTenQuestion: 'cross-ten-question',
   coldStartProbe: 'cold-start-probe',
   coldStartAssess: 'cold-start-assess',
@@ -72,6 +74,17 @@ type StoryPolishPayload = {
   expression: string;
   first: number;
   second: number;
+};
+
+type CrossTenHintPayload = {
+  expression: string;
+  prompt: string;
+  reasoningMode: 'multiStep' | 'narration';
+  stepStem?: string;
+  wrongChoice: string;
+  correctChoice?: string;
+  targetNarrative?: string;
+  hintOnWrong?: string;
 };
 
 export interface CoPilotQuestionResult {
@@ -226,6 +239,13 @@ export async function requestCrossTenQuestion(
       Number.isFinite(confidence) && confidence >= 0 && confidence <= 1 ? confidence : 0,
     estimatedTheta: Number.isFinite(estimatedTheta) ? estimatedTheta : null,
   };
+}
+
+export async function requestCrossTenHint(
+  payload: CrossTenHintPayload,
+): Promise<string | null> {
+  const result = await postJson<{ hint?: unknown }>(aiActionUrl('crossTenHint'), payload);
+  return typeof result?.hint === 'string' ? result.hint : null;
 }
 
 function isColdStartBaselineAssessment(value: unknown): value is ColdStartBaselineAssessment {

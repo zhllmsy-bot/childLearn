@@ -49,6 +49,13 @@ function OptionButtonComponent({
     state === 'idle'
       ? IDLE_PALETTE[paletteIndex % IDLE_PALETTE.length]
       : stateClass[state];
+  const label = option.label.trim();
+  const labelClass =
+    label.length <= 4
+      ? 'text-5xl md:text-6xl'
+      : label.length <= 10
+        ? 'text-3xl leading-tight md:text-4xl'
+        : 'text-xl leading-snug md:text-2xl';
 
   return (
     <motion.button
@@ -80,8 +87,8 @@ function OptionButtonComponent({
       <span className="text-2xl text-current/70" aria-hidden="true">
         {visualEmoji}
       </span>
-      <span className="text-5xl font-black text-current md:text-6xl">
-        {option.label}
+      <span className={`whitespace-normal break-words px-2 text-center font-black text-current ${labelClass}`}>
+        {label}
       </span>
     </motion.button>
   );
